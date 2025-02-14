@@ -1291,7 +1291,6 @@ body.my-account #bbpress-forums {
     font-size: 11px;
     visibility: hidden
 }
-
 #bbpress-forums li:hover>div.row-actions {
     visibility: visible
 }
