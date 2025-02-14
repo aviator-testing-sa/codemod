@@ -1,0 +1,74 @@
+	
+section.home-cover {
+    background-size: 80%;
+    background: url('/static/images/bg-home.jpg') no-repeat center bottom;
+    background-color: #1976d3;
+    min-height: 100%;
+    color: #fff;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 100px 0;
+}
+
+section.home-cover h1 {
+	color: #fff;
+    margin-bottom: 0;
+}
+
+section.home-cover span {
+    font-family: "Raleway", "Helvetica Neue", Helvetica;
+    font-size: 16px;
+}
+
+section.home-cover .hero-title {
+    padding: 40px;
+    display: inline-block;
+    background-color: rgba(25, 118, 211, 0.5);
+}
+
+section.home-cover .hero-title div {
+    padding-top: 20px;
+}
+
+section.home-cover button.btn:hover {
+    background-color: #FFC107 !important;
+    border-color: #FFC107 !important;
+    color: #fff !important;
+}
+
+section.home-cover input, button {
+    height: 45px;
+    margin: 10px auto;
+}
+section.home-cover .hero-title button {
+    min-width: 180px;
+    text-transform: uppercase;
+}
+
+section.home-cover .hero-search {
+    margin-top: 100px;
+}
+
+section.home-cover .hero-search input {
+    min-width: 60%;
+    color: #333;
+    padding: 2px 2px 2px 20px;
+    border: 0;
+    display: none;
+}
+
+section.home-cover .hero-search .btn {
+    margin-bottom: 10px;
+}
+@media (min-width: @screen-sm-min) {
+    section.home-cover {
+        min-height: 600px;
+    }
+}
+
+section.how-it-works {
+    text-align: center;
+    background-color: #fff  ;
+    min-height: 400px;
+}
+

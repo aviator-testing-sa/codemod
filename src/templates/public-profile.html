@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title public-profile-title">
+    <div class="row">
+        <div class="col-sx-12 text-center">
+            <h3>Reinvent Marketplace</h3>
+            <p>Coming Soon!</p>
+        </div>
+    </div>
+    <div class="content" style="min-height: 500px;">
+        <div class="row">
+            <div class="col-md-3"><image src="{{ user.image }}"></div>
+            <div class="col-md-3"><b>{{ user.fullname }}</b></div>
+            <div class="col-md-4">{{ user.description or "" }}</div>
+        </div>
+        <div class="row">
+            <br/><br/>
+            <div class="col-md-3"><a href={{ user.linkedin }}>LinkedIn</a></div>
+            <div class="col-md-3"><a href={{ user.angellist }}>AngelList</a></div>
+            <div class="col-md-3"><a href={{ user.twitter }}>Twitter</a></div>
+            <div class="col-md-3"><a href={{ user.facebook }}>Facebook</a></div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

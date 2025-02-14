@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "forms/base.html" as base %}
+{% block content %}
+<div class="page-title">
+  <div class="row">
+    <div class="col-sx-12 text-center">
+      <h1>List A Product</h1>
+    </div>
+  </div>
+</div>
+<div class="row row-centered">
+  <div class="content boxs center col-centered col-md-6 col-xs-11">
+    <h3>Let's get started.</h3>
+    <p>Login with your LinkedIn profile so we get to know a little about you.</p>
+    <p>This listing is created in draft mode, our team will review the listing and provide you feedback before it goes live.</p>
+      <div class="row linkedin-signup">
+          <a href='{{ auth_linked }}'>
+              <img src="/static/images/linkedin/Retina/Sign-In-Large---Default.png">
+          </a>
+      </div>
+  </div>
+</div>
+
+{% endblock content %}

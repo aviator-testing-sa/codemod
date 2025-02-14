@@ -1,0 +1,13 @@
+<form method="post" action="/bid/interest/{{ auction.id }}"
+    class="form-horizontal row row-centered" autocomplete="off">
+  <fieldset class="col-xs-11 col-md-8 col-centered">
+    <div>The message below will be sent to: <strong>{{ auction.user.fullname }}</strong></div>
+    <div class="form-group">
+        {{ form.text(class="form-control", rows="3", placeholder="Enter text here...") }}
+    </div>
+    <div>
+      <div class="errors" id="errors">{{ error }}</div>
+      {{ form.hidden_tag() }}
+    </div>
+  </fieldset>
+</form>

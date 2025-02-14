@@ -1,0 +1,12 @@
+{% extends "emails/base.html" %}
+{% block content %}<br/>
+Hi {{ user.fullname }},<br/>
+Your application for <strong>{{ listing.name }}</strong> has been completed.
+We will review the application and get back to you. Meanwhile we would love feedback from you. You can use our <a href="{{ config.BASE_URL }}/contact">Contact Us</a> form to reach out to us.<br/><br/>
+
+&mdash; The Reinvent Team<br/>
+
+<p style="font-size: 11px;">If you received this email in error and did not signup to Reinvent, please contact
+us at <a href="mailto:{{ config.SUPPORT_EMAIL }}">{{ config.SUPPORT_EMAIL }}</a><br/></p>
+
+{% endblock content %}

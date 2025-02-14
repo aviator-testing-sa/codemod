@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">
+  <div class="row">
+    <div class="col-sx-12 text-center">
+      <h1>Thank You</h1>
+    </div>
+  </div>
+</div>
+<div class="row row-centered">
+  <div class="content boxs center col-centered col-md-6">
+      <div class="row">
+          <h3>You have successfully listed the product.</h3>
+          <div class="listing center">
+              <img src="{{ listing.product_icon }}" class="listing-icon"/>
+              <h4>{{ listing.name }}</h4>
+          </div>
+          Sit tight and our team will review the application and get back to you.
+          <div class="row btn-container">
+            <button class="btn btn-primary btn-large" onclick="window.location.href='/'">OK</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+{% endblock content %}

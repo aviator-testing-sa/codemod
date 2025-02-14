@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% import "forms/base.html" as base %}
+{% block content %}
+<div class="page-title">
+    <div class="row">
+        <div class="col-sx-12 text-center">
+            <h1>List New Product</h1>
+        </div>
+    </div>
+</div>
+
+<div class="content boxs">
+    <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+            <div class="widget-title">
+                <h4>Step 1 of 3: Basic Product Info</h4>
+            </div><!-- end widget-title -->
+            <form class="uploaditem" method="post" action="/listing/create/product" enctype="multipart/form-data">
+                <div class="space">
+                    <div class="fileupload fileupload-new" data-provides="fileupload">
+                        <div class="fileupload-preview thumbnail"></div>
+                        <br>
+                        <span class="btn btn-primary btn-file">
+                            <span class="fileupload-new">Upload Product Logo</span>
+                            <span class="fileupload-exists">Change Logo</span>
+                            {{ form.product_logo() }}
+                        </span>
+                        <a href="#" class="btn btn-default fileupload-exists" data-dismiss="fileupload">Remove Logo</a>
+                    </div>
+                </div>
+                <div class="space">  
+                    <label class="required">Product Name</label>
+                    {{ form.name(class="form-control", required="required", placeholder="Enter the product name") }}
+                </div>
+                <div class="space">
+                    <label class="required">Category</label>
+                    {{ form.category(**{
+                        'class': 'selectpicker',
+                        'data-live-search': 'true'})
+                    }}
+                    {{ base.errors(form.category) }}
+                </div>
+
+                <div class="space row">   
+                    <label class="required">Platform</label>
+                    <div class="col-md-4"><label class="checkbox-label">{{ form.web_app() }} Web</label></div>
+                    <div class="col-md-4"><label class="checkbox-label">{{ form.app_ios() }} iPhone App</label></div>
+                    <div class="col-md-4"><label class="checkbox-label">{{ form.app_android() }} Android App</label></div>
+                    <div class="col-md-4"><label class="checkbox-label">{{ form.iot() }} IOT</label></div>
+                    <div class="col-md-4"><label class="checkbox-label">{{ form.robotics() }} Robotics</label></div>
+                </div>
+
+                <div class="space">
+                    <label class="required">Website URL</label>
+                    {{ form.domain(class="form-control", placeholder="E.g. http://www.reinventstartup.com") }}
+                    {{ base.errors(form.domain) }}
+                </div>                   
+                <div class="space">
+                    <label>Upload Cover Photo</label>
+                    <div class="fileupload fileupload-new" data-provides="fileupload">
+                        <div class="fileupload-preview thumbnail"></div>
+                        <br>
+                        <span class="btn btn-primary btn-file">
+                            <span class="fileupload-new">Upload Cover Image</span>
+                            <span class="fileupload-exists">Change Cover</span>
+                            {{ form.cover_image() }}
+                        </span>
+                        <a href="#" class="btn btn-default fileupload-exists" data-dismiss="fileupload">Remove Cover</a>
+                    </div>
+                </div>
+                <br/>
+                {% if error %}
+                <div class="space">
+                    <ul class="errors-list"><li>{{ error }}</li></ul>
+                </div>
+                {% endif %}
+                <div class="space">
+                    {{ form.hidden_tag() }}
+                    <button type="submit" class="btn btn-primary btn-block">SAVE AND CONTINUE</button>
+                </div>
+
+            </form>
+        </div><!-- end col -->
+    </div><!-- end row -->
+</div><!-- end content -->
+
+<br>
+{% endblock content %}
