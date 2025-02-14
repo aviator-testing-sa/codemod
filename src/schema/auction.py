@@ -24,7 +24,6 @@ class Auction(Base):
 
     listing = orm.relationship('Listing', backref=orm.backref('auctions', uselist=True))
     user = orm.relationship('User')
-
     def has_expired(self):
         today = datetime.date.today()
         return today > self.expiration.date()
