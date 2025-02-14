@@ -18,7 +18,6 @@ def index():
 def contact():
 	return redirect('https://docs.google.com/forms/d/e/1FAIpQLSfZTjld-BQgEVdaEn3dNSZAZ2Hq4bTxlgkojsbBeoij8BGD0Q/viewform')
 
-
 @app.route('/email')
 def email():
 	user = current_user.user
