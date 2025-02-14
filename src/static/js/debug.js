@@ -1,5 +1,4 @@
 $(document).ready(function() {
-
 	$('#debug-trigger').click(function(e) {
 	
 		e.preventDefault();
