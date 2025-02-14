@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% import "forms/base.html" as base %}
+{% block content %}
+<div class="page-title public-profile-title">
+    <div class="row">
+        <div class="col-sx-12 text-center">
+            <h1>Edit Account</h1>
+        </div>
+    </div>
+</div>
+<div class="content">
+    <div class="row">
+        <div class="edit-account">
+            <form method="post" action="/edit-account" enctype="multipart/form-data" role="edit-account">
+                {{ form.hidden_tag() }}
+                <div class="col-md-12">
+                    <div class="col-md-2">{{ form.slug.label }}</div>
+                    <div class="col-md-2">{{ form.slug(readonly=True) }}</div>
+                    <div class="col-md-2">{{ base.errors(form.slug) }}</div>
+
+                    <div class="col-md-2">{{ form.email.label }}</div>
+                    <div class="col-md-2">{{ form.email(readonly=True) }}</div>
+                    <div class="col-md-2">{{ base.errors(form.email) }}</div>
+                </div>
+                <div class="col-md-12">
+                    <div class="col-md-2">{{ form.fullname.label }}</div>
+                    <div class="col-md-2">{{ form.fullname(size=30) }}</div>
+                    <div class="col-md-2">{{ base.errors(form.fullname) }}</div>
+
+                    <div class="col-md-1">{{ form.firm.label }}</div>
+                    <div class="col-md-1">{{ form.firm() }}</div>
+                    <div class="col-md-2">{{ base.errors(form.firm) }}</div>
+                </div>
+                <div class="col-md-12">
+                    {% if user.is_buyer() %}
+                        <div class="col-md-2">{{ form.investments.label }}</div>
+                        <div class="col-md-2">{{ form.investments() }}</div>
+                        <div class="col-md-2">{{ base.errors(form.investments) }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-12">
+                    <br/>
+                    <div class="col-md-6">{{ form.image.label }}</div>
+                    <div class="col-md-6">{{ form.description.label }}</div>
+                    <div class="col-md-6 fileupload fileupload-new" data-provides="fileupload">
+                        <div class="fileupload-preview thumbnail">
+                            <image src="{{ user.image }}">
+                        </div>
+                        <br>
+                        <span class="btn btn-primary btn-file">
+                            <span class="fileupload-new">Select</span>
+                            <span class="fileupload-exists">Change</span>
+                            {{ form.image() }}
+                        </span>
+                        <a href="#" class="btn btn-default fileupload-exists" data-dismiss="fileupload">Remove</a>
+                        {{ base.errors(form.image) }}
+                    </div>
+                    <div class="col-md-6">{{ form.description(rows=4, cols=39) }}</div>
+                </div>
+                <div class="col-md-12">
+                    <br/>
+                    <div class="col-md-2">{{ form.linkedin.label }}</div>
+                    <div class="col-md-2">{{ form.linkedin() }}</div>
+                    <div class="col-md-2">{{ base.errors(form.linkedin) }}</div>
+
+                    <div class="col-md-2">{{ form.angellist.label }}</div>
+                    <div class="col-md-2">{{ form.angellist() }}</div>
+                    <div class="col-md-2">{{ base.errors(form.angellist) }}</div>
+                </div>
+                <div class="col-md-12">
+                    <div class="col-md-2">{{ form.twitter.label }}</div>
+                    <div class="col-md-2">{{ form.twitter() }}</div>
+                    <div class="col-md-2">{{ base.errors(form.twitter) }}</div>
+
+                    <div class="col-md-2">{{ form.facebook.label }}</div>
+                    <div class="col-md-2">{{ form.facebook() }}</div>
+                    <div class="col-md-2">{{ base.errors(form.facebook) }}</div>
+                </div>
+
+                <div class="col-md-12 text-center">
+                    <br/><br/>
+                    {% if not user.email_confirmed %}
+                        <button class="btn btn-default" onClick="sendEmailConfirmation();">Re-send Email Confirmation</button>
+                    {% endif %}
+                    <button id="updateCardDetails" class="btn btn-default">Update Card Details</button>
+                    <button type="submit" name="go" class="btn btn-primary col-md-offset-1">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://checkout.stripe.com/checkout.js"></script>
+
+<script>
+var handler = StripeCheckout.configure({
+    key: '{{ stripe_key }}',
+    image: '/static/images/logo.jpg',
+    locale: 'auto',
+    allowRememberMe: true,
+    token: function(token, args) {
+        console.log(token);
+        $.ajax({
+            url: '/customer/add_card',
+            type: 'POST',
+            data: { stripe_token: token.id },
+            success: function(data) {
+                console.log("card details updated: ", data)
+            },
+            error: function(data) {
+                console.log("ajax error: ", data);
+            }
+        }); // end ajax call
+    }   // end closure
+});
+
+document.getElementById('updateCardDetails').addEventListener('click', function(e) {
+    // Open Checkout with further options:
+    handler.open({
+        name: 'Reinvent',
+        email: '{{ user.email }}',
+        panelLabel: 'Update',
+    });
+    e.preventDefault();
+});
+
+// Close Checkout on page navigation:
+window.addEventListener('popstate', function() {
+    handler.close();
+});
+
+
+// send email confirmation
+function sendEmailConfirmation() {
+    $.get('/auth/email/send', function(data, status) {
+        if (status != 'success') {
+            alert(data)
+        }
+    });
+}
+
+</script>
+
+{% endblock content %}

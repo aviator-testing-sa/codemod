@@ -1,0 +1,17 @@
+name: Python application
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+on: [pull_request]
+
+jobs:
+  build:
+    name: "example/dummy/test"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Do the test
+        run: |
+          exit 0
