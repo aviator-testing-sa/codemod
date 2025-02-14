@@ -1,0 +1,9 @@
+{% macro errors(element) -%}
+    {% if element.errors %}
+    <ul class="errors-list">
+        {% for error in element.errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+{%- endmacro %}

@@ -1,0 +1,22 @@
+{% import "forms/base.html" as base %}
+<form method="post" action="/bid/create/{{ auction.id }}"
+    class="form-horizontal row row-centered" autocomplete="off">
+  <fieldset class="col-xs-11 col-md-8 col-centered center">
+    <div class="make-offer-description">
+      Please enter your offer below.
+      <strong>{{ auction.listing.user.fullname }}</strong> will be notified.
+    </div>
+    <div class="form-group price-input-group">
+      <span class="currency">$</span>
+      {{ form.price(placeholder="USD") }}
+      {{ base.errors(form.price) }}
+    </div>
+    <div class="form-group">
+        {{ form.text(class="form-control", rows="3", placeholder="Optional: Notes for owner...") }}
+    </div>
+    <div>
+      <div class="errors" id="errors">{{ error }}</div>
+      {{ form.hidden_tag() }}
+    </div>
+  </fieldset>
+</form>

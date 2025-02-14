@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% import "forms/base.html" as base %}
+{% block customjs %}
+<script src="/static/js/dropzone.js"></script>
+<script type="text/javascript">
+    Dropzone.autoDiscover = false;
+    $(function() {
+        // Now that the DOM is fully loaded, create the dropzone, and setup the
+        // event listeners
+        $("#my-dropzone").dropzone({
+            previewTemplate: document.getElementById('preview-template').innerHTML
+        });
+        $('#submit-listing-details').click(function() {
+            $('#listing-details').submit();
+        });
+    });
+</script>
+{% endblock customjs %}
+{% block content %}
+<div class="page-title">
+    <div class="row">
+        <div class="col-sx-12 text-center">
+            <h1>List New Product</h1>
+        </div>
+    </div>
+</div>
+
+<div class="content boxs">
+    <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+            <div class="text-left">Completion</div>
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" data-transitiongoal="33"><span>33%</span></div>
+            </div>
+            <div class="widget-title">
+                <h4>Step 2 of 3: tell us more about the company</h4>
+            </div><!-- end widget-title -->
+            <form class="uploaditem" id="listing-details" method="post" action="/listing/create/details/{{ listing.id }}">
+                <div class="space">  
+                    <label>Startup LinkedIn URL</label>
+                    {{ form.linkedin(class="form-control",
+                        placeholder="https://") }}
+                    {{ base.errors(form.linkedin) }}
+                </div>
+                <div class="space">  
+                    <label>Startup AngelList URL</label>
+                    {{ form.angellist(class="form-control",
+                        placeholder="E.g. https://") }}
+                    {{ base.errors(form.angellist) }}
+                </div>
+                <div class="space">  
+                  <label>Startup Crunchbase URL</label>
+                    {{ form.crunchbase(class="form-control",
+                        placeholder="E.g. https://") }}
+                    {{ base.errors(form.crunchbase) }}
+                </div>
+                <div class="space">
+                    <label>Product Details</label>
+                    {{ form.product_info(
+                        placeholder="E.g. Reinvent facilitates buying and selling of intellectual property...",
+                        class="form-control") }}
+                    {{ base.errors(form.product_info)}}
+                </div>
+                <div class="space">
+                    <label>Explain technology stack</label>
+                    {{ form.tech_stack(
+                        placeholder="E.g. Reinvent is built on Google Cloud using python-flask framework...",
+                        class="form-control") }}
+                    {{ base.errors(form.tech_stack)}}
+                </div>
+                <div class="space">
+                    <label>Founder Details</label>
+                    {{ form.founder_info(
+                        placeholder="E.g. Started by ex-Googlers, Steve worked on Google Ads...",
+                        class="form-control") }}
+                    {{ base.errors(form.founder_info)}}
+                </div>
+                <br/>
+                {{ form.hidden_tag() }}
+                {% if error %}
+                <div class="space">
+                    <ul class="errors-list"><li>{{ error }}</li></ul>
+                </div>
+                {% endif %}
+            </form>
+            <div class="space">
+                <label>Upload Product Screenshots</label>
+                <form action="/listing/upload-screenshot/{{ listing.id }}" class="my-dropzone" id="my-dropzone">
+                    <div class="dz-message needsclick">Drop files here or click to upload.</div>
+                </form>
+            </div>
+            <div class="space">
+                <button type="submit" id="submit-listing-details" class="btn btn-primary btn-block">SAVE AND CONTINUE</button>
+            </div>  
+        </div><!-- end col -->
+    </div><!-- end row -->
+</div><!-- end content -->
+
+{% include 'forms/dropzone.html' %}
+<br>
+{% endblock content %}

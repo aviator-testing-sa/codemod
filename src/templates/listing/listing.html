@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}{{ listing.name }} | Reinvent{% endblock title %}
+{% block cover_img %}{{ listing.cover_image }}{% endblock %}
+{% block customcss %}
+<link rel="stylesheet" type="text/css" href="/static/css/flexslider.css">
+{% endblock customcss %}
+{% block customjs %}
+<script src="/static/js/flexslider.js"></script>
+<script src="/static/js/timer.js"></script>
+<script>
+    (function($) {
+    "use strict";
+    $(window).load(function() {
+        $('#carousel').flexslider({
+            animation: "slide",
+            controlNav: false,
+            directionNav: false,
+            animationLoop: true,
+            slideshow: true,
+            itemWidth: 92,
+            itemMargin: 0,
+            asNavFor: '#slider'
+        });
+   
+        $('#slider').flexslider({
+            animation: "fade",
+            controlNav: false,
+            animationLoop: false,
+            slideshow: true,
+            sync: "#carousel"
+        });
+        {% if auction and not auction.has_expired() %}
+        $('#datatime').countdown({
+            date: '{{ auction.expiration.strftime("%m/%d/%Y") }} 23:59:59',
+            day: 'Day',
+            days: 'Days'
+         }, function () {
+            alert('Done!');
+        });
+        {% endif %}
+    });
+    })(jQuery);
+</script>
+{% endblock customjs %}
+{% block content %}
+<div class="page-title">
+    <div class="row">
+        <div class="col-sx-12 text-center">
+            <h1>{{ listing.name }}</h1>
+        </div>
+    </div>
+</div>
+
+<div class="content-top">
+    <div class="row">
+        <div class="col-sx-6 col-sm-6">
+        </div> 
+
+        <div class="col-sm-6 col-xs-12 cen-xs text-right">
+            <div class="bread">
+                <ol class="breadcrumb">
+                  <li><a href="#">Home</a></li>
+                  <li><a href="#">{{ listing.category }}</a></li>
+                  <li class="active">{{ listing.name }}</li>
+                </ol>
+            </div>
+        </div>
+    </div><!-- end row -->
+</div><!-- end content top -->
+
+<div class="row">
+    <div id="singlewrapper" class="col-md-8">
+        <div class="content nopad">
+            <div class="item-single-wrapper">
+                <div class="item-box">
+                    <div class="item-media text-center">
+                        <div id="slider" class="flexslider clearfix">
+                            <ul class="slides">
+                                {% for image in listing.images %}
+                                <li><img src="{{ image.url }}" alt="" class="img-responsive"></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div id="carousel" class="flexslider clearfix">
+                            <ul class="slides">
+                                {% for image in listing.images %}
+                                <li><img src="{{ image.url }}" alt="" class="img-responsive"></li>
+                                {% endfor %}
+                            </ul>
+                        </div>  
+                    </div><!-- end item-media -->
+
+                    <div class="item-desc">
+                        <p>{{ listing.product_info | escape_custom }}</p>
+                    </div><!-- end item-desc -->
+                </div><!-- end item-box -->
+            </div><!-- end item-single-wrapper -->
+        </div><!-- end content -->
+        <div class="content-after boxs">
+            <div class="row">
+                <div class="col-md-12 general-title">
+                    <h4>About Founders</h4>
+                    <hr>
+                </div>
+            </div>
+            <div class="row">
+                <div class="item-desc">
+                    <p>{{ listing.founder_info | escape_custom }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="content-after boxs">
+            <div class="row">
+                <div class="col-md-12 general-title">
+                    <h4>Tech Stack</h4>
+                    <hr>
+                </div>
+            </div>
+            <div class="row">
+                <div class="item-desc">
+                    <p>{{ listing.tech_stack | escape_custom }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="content-after boxs">
+            <div class="row">
+                <div class="col-md-12 general-title">
+                    <h4>Related Products <span class="hidden-xs"><a href="public-profile.html">View all</a></span></h4>
+                    <hr>
+                </div><!-- end col -->
+            </div><!-- end row -->
+            <div class="row">
+                <img src="/static/images/recent.png">
+                {% for item in related_products %}
+                <div class="col-md-4 col-sm-6">
+                    <div class="item-box">
+                        <div class="item-media entry">
+                            <img src="{{ item.cover_image }}" alt="" class="img-responsive">
+                            <div class="magnifier">
+                                <div class="item-author">
+                                    <a href="public-profile.html"><img src="{{ item.user.profile_image }}"
+                                        class="img-circle" alt=""> {{ item.user.fullname }}</a>
+                                </div><!-- end author -->
+                            </div>
+                            <div class="theme__button">
+                                <p><a href="single-item.html" title="">$21</a></p>
+                            </div>
+                        </div><!-- end item-media -->
+                        <h4><a href="/product/{{ item.id }}">{{ item.name }}</a></h4>
+                        <small><a href="#"><i class="fa fa-eye"></i> {{ range(500, 1200) | random }}</a></small>
+                        <small><a href="#"><i class="fa fa-star-o"></i> {{ range(10, 100) | random }}</a></small>
+                    </div><!-- end item-box -->
+                </div><!-- end col -->
+                {% endfor %}
+            </div><!-- end row -->
+        </div><!-- end content after -->
+    </div><!-- end singlewrapper -->
+
+    <div id="sidebar" class="col-md-4">
+        <div class="boxes boxs">
+            <div class="item-price text-center">
+                {% if auction and not auction.has_expired() %}
+                <p>$ 25, 000</p>
+                {% elif auction %}
+                <p>Auction Ended</p>
+                {% else %}
+                <p>Not Active</p>
+                {% endif %}
+                <em><a href="#">Regular License</a></em>
+                {% if auction and not auction.has_expired() %}
+                <hr>
+                <div>
+                  <ul id="datatime" class="list-inline"><div class="expires">Expires in</div>
+                    <li><span class="days">00</span><div class="days_text">Days</div></li>
+                    <li><span class="hours">00</span><div class="hours_text">Hours</div></li>
+                    <li><span class="minutes">00</span><div class="minutes_text">Minutes</div></li>
+                    <li><span class="seconds">00</span><div class="seconds_text">Seconds</div></li>
+                  </ul>
+                </div>
+                {% endif %}
+                <hr>
+                <div class="item-platform">Supported Platforms:
+                    <ul class="list-inline platform">
+                    {% if listing.web_app %}<li><a href="#" title="Web App" data-toggle="tooltip" data-placement="top" title="Web App"><i class="fa fa-desktop"></i></a></li>{% endif %}
+                    {% if True %}<li><a href="#" title="iOS App" data-toggle="tooltip" data-placement="top" title="iOS App"><i class="fa fa-apple"></i></a></li>{% endif %}
+                    {% if listing.app_android %}<li><a href="#" title="Android App" data-toggle="tooltip" data-placement="top" title="Android App"><i class="fa fa-android"></i></a></li>{% endif %}
+                    </ul>
+                </div>
+                <!--
+                <hr>
+                <small><a href="#"><i class="fa fa-star-o"></i> Add to Favorites</a> &nbsp;&nbsp; <a href="#"><i class="fa fa-heart-o"></i> Like it</a> </small>-->
+                <hr>
+                {% if auction and not auction.has_expired() %}
+                <a href="#" class="btn btn-primary" data-click="popup" data-url="/bid/create/{{ auction.id }}" data-title="Make An Offer">Make An Offer</a>
+                <a href="#" class="btn btn-default" data-click="popup" data-url="/bid/interest/{{ auction.id }}" data-title="Ask a Question">Ask a Question</a>
+                {% else %}
+                <a href="#" class="btn btn-primary">Contact Owner</a>
+                {% endif %}
+                <ul class="list-inline social">
+                    <li><a href="#"><i class="fa fa-facebook"></i></a></li>
+                    <li><a href="#"><i class="fa fa-twitter"></i></a></li>
+                    <li><a href="#"><i class="fa fa-linkedin"></i></a></li>
+                </ul>
+            </div><!-- end price -->
+        </div><!-- end boxes -->
+        <div class="boxes boxs">
+            <div class="row">
+                <div class="col-md-12 general-title">
+                    <h4>Business Metrics</h4>
+                    <em>Visible to Approved Buyers only</em>
+                    <hr>
+                </div>
+            </div>
+            <div class="item-details">
+                {# TODO: This needs to be hidden if not approved user. #}
+
+                <table width="100%">
+                    <tr>
+                        <td>Release on:</td>
+                        <td>{% if listing.lauch_date %}{{ listing.launch_date.strftime("%m-%d-%Y") }}{% else %}&mdash;{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Total Users:</td>
+                        <td>{{ (listing.total_customers | number) or '–'}}</td>
+                    </tr>
+                    <tr>
+                        <td>Investment:</td>
+                        <td>{{ listing.investment_cents | cents_number}}</td>
+                    </tr>
+                    <tr>
+                        <td>Revenue:</td>
+                        <td>{{ listing.revenue_cents | cents_number }} / month</td>
+                    </tr>
+                    <tr>
+                        <td>Incorporated:</td>
+                        <td>{% if listing.incorporated %}Yes{% else %}No{% endif %}</td>
+                    </tr>
+                </table>
+            </div><!-- end item-details -->
+        </div><!-- end boxes -->
+        <div class="boxes boxs">
+            <div class="desiger-details text-center">
+                <img src="{{ listing.user.profile_image }}" class="img-circle profile-img" alt=""></a>
+                <h4><a href="/profile/{{ listing.user_id}}">{{ listing.user.fullname }}</a></h4>
+                <small><a href="#" data-click="popup" data-url="/send_message/{{ listing.userid }}" data-title="Send Message">
+                    <i class="fa fa-envelope-o"></i> Send a Message</a> &nbsp;&nbsp; <a href="#"><i class="fa fa-user-plus"></i> Follow</a> </small>
+            </div><!-- end designer -->
+        </div><!-- end boxes -->
+        <div class="boxes boxs">
+            <div class="row">
+                <div class="col-md-12 general-title">
+                    <h4>Timeline</h4>
+                    <hr>
+                </div>
+            </div>
+            <div class="row">
+                <ul class="events">
+                    {% for activity in activities %}
+                    {% include 'listing/activity_small.html' %}
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+    </div><!-- end sidebar -->
+</div><!-- end row -->
+{% endblock content %}

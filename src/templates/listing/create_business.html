@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% import "forms/base.html" as base %}
+{% block content %}
+<div class="page-title">
+    <div class="row">
+        <div class="col-sx-12 text-center">
+            <h1>List New Product</h1>
+        </div>
+    </div>
+</div>
+
+<div class="content boxs">
+    <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+            <div class="text-left">Completion</div>
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" data-transitiongoal="66"><span>66%</span></div>
+            </div>
+            <div class="widget-title">
+                <h4>Step 3 of 3: Business Details (only shared with approved Buyers)</h4>
+            </div><!-- end widget-title -->
+            <form class="uploaditem" method="post" action="/listing/create/business/{{ listing.id }}">
+                <div class="space">  
+                    <label>Is the company incorporated?</label>
+                    <label class="checkbox-label">{{ form.incorporated() }} Yes</label>
+                    {{ base.errors(form.incorporated) }}
+                </div>
+                <div class="space">  
+                    <label>Date of First Launch (Leave empty if never launched)</label>
+                    {{ form.launch_date(placeholder="MM/DD/YYYY") }}
+                    {{ base.errors(form.launch_date) }}
+                </div>
+                <div class="space">  
+                    <label>Total users</label>
+                    {{ form.total_customers(placeholder="0") }}
+                    {{ base.errors(form.total_customers) }}
+                </div>
+                <div class="space">
+                    <label>Monthly Active Users</label>
+                    {{ form.mau(placeholder="0") }}
+                    {{ base.errors(form.mau) }}
+                </div>
+                <div class="space">
+                    <label>Monthly Revenues (USD)</label>
+                    {{ form.revenue(placeholder="0") }}
+                    {{ base.errors(form.revenue) }}
+                </div>
+                <div class="space">
+                    <label>Total capital investment to date (USD)</label>
+                    {{ form.investment() }}
+                    {{ base.errors(form.investment) }}
+                </div>
+                <div class="space">
+                    <label>Total employees (current or past)</label>
+                    {{ form.employees() }}
+                    {{ base.errors(form.employees) }}
+                </div>
+                <div class="space">
+                    <label>Additional Info</label>
+                    {{ form.misc_info(placeholder="Any patents? Current state of business...", class="form-control") }}
+                    {{ base.errors(form.misc_info) }}
+                </div>
+                <br/>
+                {% if error %}
+                <div class="space">
+                    <ul class="errors-list"><li>{{ error }}</li></ul>
+                </div>
+                {% endif %}
+                <div class="space">
+                    {{ form.hidden_tag() }}
+                    <button type="submit" class="btn btn-primary col-xs-5">SAVE</button>
+                    <div class="clearfix"></div>
+                </div>
+
+            </form>
+        </div><!-- end col -->
+    </div><!-- end row -->
+</div><!-- end content -->
+
+<br>
+{% endblock content %}
