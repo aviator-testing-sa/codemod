@@ -6,7 +6,6 @@ function disableOther(s) {
     function e(s) {
         return new RegExp("(^|\\s+)" + s + "(\\s+|$)")
     }
-
     function t(s, e) {
         var t = n(s, e) ? c : a;
         t(s, e)
