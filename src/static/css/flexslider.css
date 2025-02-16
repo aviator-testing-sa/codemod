@@ -60,7 +60,6 @@ html[xmlns] .slides {display: block;}
 padding-bottom:0; height: 10px; display: block; background: #ffffff;  background:rgba(255,255,255,0.7);cursor: pointer; text-indent: -9999px; }
 .flex-control-paging li a:hover { background: #ffffff; }
 .flex-control-paging li a.flex-active { background: #ffffff; background:rgba(255,255,255,0.9); cursor: default; }
-
 .flex-control-thumbs {margin: 5px 0 0; position: static; overflow: hidden;}
 .flex-control-thumbs li {width: 25%; float: left; margin: 0;}
 .flex-control-thumbs img {width: 100%; display: block; opacity: 1; cursor: pointer;}
