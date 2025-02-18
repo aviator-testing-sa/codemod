@@ -1,6 +1,7 @@
 import datetime
 import utils
 from main import app
+from flask import url_for
 
 @app.context_processor
 def inject_params():
@@ -14,10 +15,10 @@ def inject_params():
     return params
 
 def image_path(path, external=False):
-    base_url = '/static/images/'
     if external:
-        base_url = app.config['BASE_URL'] + base_url
-    return base_url + path
+        return url_for('static', filename='images/' + path, _external=True)
+    else:
+        return url_for('static', filename='images/' + path)
 
 def post_date_format(time):
     return utils.pretty_date(time)
