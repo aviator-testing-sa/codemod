@@ -1,21 +1,21 @@
 {% if activity.type == 'auction' and activity.status == 'new' %}
   <li class="activity activity-new">
-	Auction started by <a href="/profile/{{ activity.userid }}">{{ activity.user.fullname }}</a> &mdash;
-	<span class="activity-date">{{ post_date_format(activity.created) }}</span>
+    Auction started by <a href="/profile/{{ activity.userid }}">{{ activity.user.fullname }}</a> &mdash;
+    <span class="activity-date">{{ post_date_format(activity.created) }}</span>
   </li>
 {% elif activity.type == 'auction' and activity.status == 'cancel' %}
   <li class="activity activity-cancel">
-	Auction closed by <a href="/profile/{{ activity.userid }}">{{ activity.user.fullname }}</a> &mdash;
-	<span class="activity-date">{{ post_date_format(activity.created) }}</span>
+    Auction closed by <a href="/profile/{{ activity.userid }}">{{ activity.user.fullname }}</a> &mdash;
+    <span class="activity-date">{{ post_date_format(activity.created) }}</span>
   </li>
 {% elif activity.type == 'interest' %}
   <li class="activity activity-interest">
-	<a href="/profile/{{ activity.userid }}">{{ activity.user.fullname }}</a> has shown interest &mdash;
-	<span class="activity-date">{{ post_date_format(activity.created) }}</span>
+    <a href="/profile/{{ activity.userid }}">{{ activity.user.fullname }}</a> has shown interest &mdash;
+    <span class="activity-date">{{ post_date_format(activity.created) }}</span>
   </li>
 {% elif activity.type == 'bid' %}
   <li class="activity activity-bid">
-	<a href="/profile/{{ activity.userid }}">{{ activity.user.fullname }}</a> has placed a bid &mdash;
-	<span class="activity-date">{{ post_date_format(activity.created) }}</span>
+    <a href="/profile/{{ activity.userid }}">{{ activity.user.fullname }}</a> has placed a bid &mdash;
+    <span class="activity-date">{{ post_date_format(activity.created) }}</span>
   </li>
 {% endif %}

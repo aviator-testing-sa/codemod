@@ -217,7 +217,7 @@
                 <table width="100%">
                     <tr>
                         <td>Release on:</td>
-                        <td>{% if listing.lauch_date %}{{ listing.launch_date.strftime("%m-%d-%Y") }}{% else %}&mdash;{% endif %}</td>
+                        <td>{% if listing.launch_date %}{{ listing.launch_date.strftime("%m-%d-%Y") }}{% else %}&mdash;{% endif %}</td>
                     </tr>
                     <tr>
                         <td>Total Users:</td>
@@ -261,7 +261,6 @@
                 </ul>
             </div>
         </div>
-
     </div><!-- end sidebar -->
 </div><!-- end row -->
 {% endblock content %}
