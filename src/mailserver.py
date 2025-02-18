@@ -8,12 +8,10 @@ import multiprocessing
 import threading
 
 
-
 class Threaded(object):
     def __init__(self, smtp):
         self.smtp = smtp
-        self.thread = threading.Thread(target=asyncore.loop,
-                kwargs={'timeout' : 1})
+        self.thread = threading.Thread(target=asyncore.loop, kwargs={"timeout": 1})
         self.thread.start()
 
     def close(self):
