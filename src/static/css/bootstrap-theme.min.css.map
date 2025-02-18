@@ -1,1 +1,104 @@
-{"version":3,"sources":["less/theme.less","less/mixins/vendor-prefixes.less","less/mixins/gradients.less","less/mixins/reset-filter.less"],"names":[],"mappings":"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"}
+/*
+Theme picked from https://bootswatch.com/default/
+Variables picked to match theme
+*/
+@body-bg: #ffffff;
+@text-color: #292929;
+@link-color: #2A6496;
+@link-hover-color: darken(@link-color, 15%);
+
+@font-family-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
+@font-size-base: 14px;
+
+@border-radius-base: 4px;
+@border-radius-large: 6px;
+@border-radius-small: 3px;
+
+@component-active-color: #fff;
+@component-active-bg: #2A6496;
+
+/* Navbar
+-------------------------------------------------- */
+
+@navbar-default-bg: #F8F8F8;
+@navbar-default-color: #777;
+@navbar-default-link-color: #777;
+@navbar-default-link-hover-color: #333;
+@navbar-default-link-active-color: @component-active-color;
+@navbar-default-link-active-bg: @component-active-bg;
+
+/* Buttons
+-------------------------------------------------- */
+
+@btn-default-color: #777;
+@btn-default-bg: #fff;
+@btn-default-border: #ccc;
+
+/* Tables
+-------------------------------------------------- */
+
+@table-border-color: #ddd;
+@table-bg-accent: #f9f9f9;
+@table-bg-hover: #f5f5f5;
+@table-bg-active: @table-bg-hover;
+
+/* Dropdowns
+-------------------------------------------------- */
+
+@dropdown-border: rgba(0,0,0,.15);
+@dropdown-fallback-border: #ccc;
+@dropdown-divider-bg: #e5e5e5;
+
+/* Panels
+-------------------------------------------------- */
+
+@panel-bg: #fff;
+@panel-default-border: #ddd;
+
+/* Wells
+-------------------------------------------------- */
+
+@well-bg: #f5f5f5;
+
+/* Type
+-------------------------------------------------- */
+
+@headings-small-color: #999;
+@text-muted: #777;
+
+/* Progress bars
+-------------------------------------------------- */
+
+@progress-bg: #f5f5f5;
+
+/* List group
+-------------------------------------------------- */
+
+@list-group-border: #ddd;
+@list-group-bg: #fff;
+@list-group-hover-bg: #f5f5f5;
+@list-group-active-color: @component-active-color;
+@list-group-active-bg: @component-active-bg;
+@list-group-active-border: @list-group-active-bg;
+
+/* Mixins
+-------------------------------------------------- */
+.reset-filter() {
+  filter: progid:DXImageTransform.Microsoft.gradient(enabled = false);
+  filter: none;
+}
+.vendor-prefix(@property, @value) {
+  -webkit-@{property}: @value;
+  -moz-@{property}: @value;
+  -ms-@{property}: @value;
+  -o-@{property}: @value;
+  @{property}: @value;
+}
+.gradient (@startColor: #eee, @endColor: white) {
+	background-color: @startColor;
+	background-image: -moz-linear-gradient(top, @startColor, @endColor); /* Firefox */
+	background-image: -webkit-gradient(linear, 0 0, 0 100%, from(@startColor), to(@endColor)); /* older webkit */
+	background-image: -webkit-linear-gradient(top, @startColor, @endColor); /* Safari 5.1+, Chrome 10+ */
+	background-image: -o-linear-gradient(top, @startColor, @endColor); /* Opera 11.10+ */
+	background-image: linear-gradient(to bottom, @startColor, @endColor); /* W3C */
+}
