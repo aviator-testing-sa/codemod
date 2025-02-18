@@ -1,12 +1,28 @@
-{% extends "emails/base.html" %}
-{% block content %}<br/>
-Hi {{ user.fullname }},<br/>
-Your application for <strong>{{ listing.name }}</strong> has been completed.
-We will review the application and get back to you. Meanwhile we would love feedback from you. You can use our <a href="{{ config.BASE_URL }}/contact">Contact Us</a> form to reach out to us.<br/><br/>
-
-&mdash; The Reinvent Team<br/>
-
-<p style="font-size: 11px;">If you received this email in error and did not signup to Reinvent, please contact
-us at <a href="mailto:{{ config.SUPPORT_EMAIL }}">{{ config.SUPPORT_EMAIL }}</a><br/></p>
-
-{% endblock content %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application Completed</title>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td>
+        <table align="center" width="600" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+          <tr>
+            <td style="padding: 20px;">
+              <p>Hi {{ user.fullname }},</p>
+              <p>Your application for <strong>{{ listing.name }}</strong> has been completed.</p>
+              <p>We will review the application and get back to you. Meanwhile we would love feedback from you. You can use our <a href="{{ config.BASE_URL }}/contact">Contact Us</a> form to reach out to us.</p>
+              <p>&mdash; The Reinvent Team</p>
+              <p style="font-size: 11px;">If you received this email in error and did not signup to Reinvent, please contact
+                us at <a href="mailto:{{ config.SUPPORT_EMAIL }}">{{ config.SUPPORT_EMAIL }}</a></p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
