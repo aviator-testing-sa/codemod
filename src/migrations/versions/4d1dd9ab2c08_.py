@@ -38,8 +38,8 @@ def upgrade():
     sa.Column('twitter', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_user_email'), 'user', ['email'], unique=True)
-    op.create_index(op.f('ix_user_slug'), 'user', ['slug'], unique=True)
+    op.create_index('ix_user_email', 'user', ['email'], unique=True)
+    op.create_index('ix_user_slug', 'user', ['slug'], unique=True)
     op.create_table('listing',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('active', sa.Boolean(), nullable=True),
@@ -65,7 +65,7 @@ def upgrade():
     sa.ForeignKeyConstraint(['userid'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_listing_domain'), 'listing', ['domain'], unique=False)
+    op.create_index('ix_listing_domain', 'listing', ['domain'], unique=False)
     op.create_table('login',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('active', sa.Boolean(), nullable=True),
@@ -73,7 +73,7 @@ def upgrade():
     sa.Column('updated', sa.DateTime(), nullable=True),
     sa.Column('userid', sa.Integer(), nullable=False),
     sa.Column('date', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['userid'], [u'user.id'], ondelete=u'CASCADE'),
+    sa.ForeignKeyConstraint(['userid'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('auction',
@@ -108,9 +108,9 @@ def downgrade():
     op.drop_table('listing_image')
     op.drop_table('auction')
     op.drop_table('login')
-    op.drop_index(op.f('ix_listing_domain'), table_name='listing')
+    op.drop_index('ix_listing_domain', table_name='listing')
     op.drop_table('listing')
-    op.drop_index(op.f('ix_user_slug'), table_name='user')
-    op.drop_index(op.f('ix_user_email'), table_name='user')
+    op.drop_index('ix_user_slug', table_name='user')
+    op.drop_index('ix_user_email', table_name='user')
     op.drop_table('user')
     ### end Alembic commands ###
