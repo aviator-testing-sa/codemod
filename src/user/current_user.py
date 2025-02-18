@@ -1,4 +1,4 @@
-from flask.ext.login import AnonymousUserMixin
+from flask_login import AnonymousUserMixin
 
 
 class CurrentUser:
@@ -23,7 +23,7 @@ class CurrentUser:
         return self.anonymous
 
     def get_id(self):
-        return self.userid
+        return str(self.userid)  # Ensure ID is a string
 
     def get_name(self):
         return self.user.name
