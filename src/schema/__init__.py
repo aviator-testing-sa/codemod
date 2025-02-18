@@ -1,7 +1,3 @@
-#
-# import schema
-#
-#
 import user
 import login
 import listing

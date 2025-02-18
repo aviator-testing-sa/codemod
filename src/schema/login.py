@@ -1,15 +1,17 @@
-#
-# login.py - all your login db needs
-#
-#
 from sqlalchemy import orm
-from main import db
-from base import Base
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import mapped_column
+from sqlalchemy.types import Integer
 
+
+Base = declarative_base()
 
 class Login(Base):
     __tablename__ = 'login'
-    userid = db.Column(db.ForeignKey(u'user.id', ondelete=u'CASCADE'), nullable=False)
-    date = db.Column(db.DateTime)
-    user = orm.relationship(u'User')
-
+    id: Mapped[int] = mapped_column(primary_key=True)
+    userid: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
+    date: Mapped[DateTime] = mapped_column(DateTime)
+    user: Mapped["User"] = relationship(back_populates="logins")  # Assuming User class exists

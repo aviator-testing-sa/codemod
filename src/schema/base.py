@@ -4,14 +4,16 @@
 #
 import datetime
 
-from main import db
+from sqlalchemy import Column, Integer, Boolean, DateTime
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import Mapped, mapped_column
 
-class Base(db.Model):
+
+class Base(DeclarativeBase):
     __abstract__ = True
 
-    id = db.Column(db.Integer, primary_key=True)
-    active = db.Column(db.Boolean, default=True)
-    created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    updated = db.Column(db.DateTime, default=datetime.datetime.utcnow,
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    updated: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow,
         onupdate=datetime.datetime.utcnow)
-
