@@ -12,7 +12,7 @@
     <div class="row">
         <div class="edit-account">
             <form method="post" action="/edit-account" enctype="multipart/form-data" role="edit-account">
-                {{ form.hidden_tag() }}
+                {{ form.csrf_token }}
                 <div class="col-md-12">
                     <div class="col-md-2">{{ form.slug.label }}</div>
                     <div class="col-md-2">{{ form.slug(readonly=True) }}</div>
