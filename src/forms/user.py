@@ -1,4 +1,4 @@
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import validators
 from wtforms import BooleanField
 from wtforms import TextAreaField
@@ -7,7 +7,7 @@ from wtforms import DecimalField
 from wtforms import FileField
 
 
-class EditBuyer(Form):
+class EditBuyer(FlaskForm):
     slug = TextField(label="Username", validators=[validators.InputRequired()])
     email = TextField(label="Email", validators=[validators.InputRequired()])
     fullname = TextField(label="Full Name")
@@ -22,7 +22,7 @@ class EditBuyer(Form):
 
 
 
-class EditSeller(Form):
+class EditSeller(FlaskForm):
     slug = TextField(label="Username", validators=[validators.InputRequired()])
     email = TextField(label="Email", validators=[validators.InputRequired()])
     fullname = TextField(label="Full Name")
@@ -33,4 +33,3 @@ class EditSeller(Form):
     angellist = TextField(label="AngelList", validators=[validators.Optional()])
     twitter = TextField(label="Twitter", validators=[validators.Optional()])
     facebook = TextField(label="Facebook", validators=[validators.Optional()])
-
