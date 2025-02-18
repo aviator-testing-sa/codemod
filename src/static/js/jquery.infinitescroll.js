@@ -21,7 +21,7 @@
         // Browser globals
         factory(jQuery);
     }
-}(function ($, undefined) {
+}(function ($) {
     'use strict';
 
     $.infinitescroll = function infscr(options, callback, element) {
@@ -102,9 +102,9 @@
             }
 
             if (binding === 'unbind') {
-                (this.options.binder).unbind('smartscroll.infscr.' + instance.options.infid);
+                (this.options.binder).off('smartscroll.infscr.' + instance.options.infid);
             } else {
-                (this.options.binder)[binding]('smartscroll.infscr.' + instance.options.infid, function () {
+                (this.options.binder).on('smartscroll.infscr.' + instance.options.infid, function () {
                     instance.scroll();
                 });
             }
@@ -184,7 +184,7 @@
                 }
 
                 if (opts.prefill) {
-                    $window.bind('resize.infinite-scroll', instance._prefill);
+                    $window.on('resize.infinite-scroll', instance._prefill);
                 }
             };
 
@@ -222,9 +222,9 @@
                     instance.scroll();
                 }
 
-                $window.bind('resize.infinite-scroll', function() {
+                $window.on('resize.infinite-scroll', function() {
                     if (needsPrefill()) {
-                        $window.unbind('resize.infinite-scroll');
+                        $window.off('resize.infinite-scroll');
                         instance.scroll();
                     }
                 });
@@ -269,15 +269,15 @@
                 this._debug('pathParse manual');
                 return opts.pathParse(path, this.options.state.currPage+1);
 
-            } else if (path.match(/^(.*?)\b2\b(.*?$)/)) {
+            } else if (/^(.*?)\b2\b(.*?$)/.test(path)) {
                 path = path.match(/^(.*?)\b2\b(.*?$)/).slice(1);
 
                 // if there is any 2 in the url at all.
-            } else if (path.match(/^(.*?)2(.*?$)/)) {
+            } else if (/^(.*?)2(.*?$)/.test(path)) {
 
                 // page= is used in django:
                 // http://www.infinite-scroll.com/changelog/comment-page-1/#comment-127
-                if (path.match(/^(.*?page=)2(\/.*|$)/)) {
+                if (/^(.*?page=)2(\/.*|$)/.test(path)) {
                     path = path.match(/^(.*?page=)2(\/.*|$)/).slice(1);
                     return path;
                 }
@@ -288,7 +288,7 @@
 
                 // page= is used in drupal too but second page is page=1 not page=2:
                 // thx Jerod Fritz, vladikoff
-                if (path.match(/^(.*?page=)1(\/.*|$)/)) {
+                if (/^(.*?page=)1(\/.*|$)/.test(path)) {
                     path = path.match(/^(.*?page=)1(\/.*|$)/).slice(1);
                     return path;
                 } else {
@@ -813,7 +813,9 @@
             // set correct event type
             event.type = 'smartscroll';
 
-            if (scrollTimeout) { clearTimeout(scrollTimeout); }
+            if (scrollTimeout) {
+                clearTimeout(scrollTimeout);
+            }
             scrollTimeout = setTimeout(function () {
                 $(context).trigger('smartscroll', args);
             }, execAsap === 'execAsap' ? 0 : 100);

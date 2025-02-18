@@ -32,7 +32,13 @@
       if (detail == null) {
         detail = null;
       }
-      if (document.createEvent != null) {
+      if (typeof Event === 'function') {
+        customEvent = new Event(event, {
+          bubbles: bubble,
+          cancelable: cancel,
+          detail: detail
+        });
+      } else if (document.createEvent != null) {
         customEvent = document.createEvent('CustomEvent');
         customEvent.initCustomEvent(event, bubble, cancel, detail);
       } else if (document.createEventObject != null) {
@@ -304,7 +310,7 @@
 
     WOW.prototype.show = function(box) {
       this.applyStyle(box);
-      box.className = box.className + " " + this.config.animateClass;
+      box.classList.add(this.config.animateClass);
       if (this.config.callback != null) {
         this.config.callback(box);
       }
@@ -521,4 +527,3 @@ ANIMATION -->
           live:         true        // default
       })
       wow.init();
-      
