@@ -1,7 +1,7 @@
 import flask
 import flask_wtf
 import hashlib
-import httplib
+import http.client as httplib
 import itsdangerous
 import logging
 import os
@@ -16,6 +16,8 @@ from main import db
 from user.current_user import CurrentUser
 import utils
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 def login_user(user, remember=False):
@@ -28,9 +30,13 @@ def get_user_by_name(name):
     """
     Fetch by email or username
     """
-    user = schema.user.User.get_by_email(name)
+    # user = schema.user.User.get_by_email(name)
+    with Session(db.engine) as session:
+        user = session.execute(select(schema.user.User).where(schema.user.User.email == name)).scalar_one_or_none()
     if user is None:
-        user = schema.user.User.get_by_slug(name)
+        # user = schema.user.User.get_by_slug(name)
+        with Session(db.engine) as session:
+            user = session.execute(select(schema.user.User).where(schema.user.User.slug == name)).scalar_one_or_none()
     return user
 
 def login(name, password, remember):
@@ -63,8 +69,9 @@ def register(form):
         type=form.type.data,
         status=schema.user.UserStatus.new)
 
-    db.session.add(user)
-    db.session.commit()
+    with Session(db.engine) as session:
+        session.add(user)
+        session.commit()
 
     # go ahead and login
     login_user(user)
@@ -83,8 +90,9 @@ def reset_password(user, password_raw):
     user.password = password
     user.salt = salt
 
-    db.session.add(user)
-    db.session.commit()
+    with Session(db.engine) as session:
+        session.add(user)
+        session.commit()
 
     login_user(user)
 
@@ -173,7 +181,9 @@ def send_reset_email_by_user(user):
 
 def validate_email(email):
     # Check if the user is already registered.
-    user = schema.User.query.filter_by(email_id=email).first()
+    # user = schema.User.query.filter_by(email_id=email).first()
+    with Session(db.engine) as session:
+        user = session.execute(select(schema.User).filter_by(email_id=email)).scalar_one_or_none()
     if user:
         raise UserWarning("Email Already exists")
     if not _is_valid_email(email):

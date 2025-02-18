@@ -1,4 +1,4 @@
-import httplib
+import http
 import itertools
 import logging
 import emails
@@ -12,10 +12,10 @@ from flask import render_template
 from flask import request
 from flask import session
 from flask import url_for
-from flask.ext.login import current_user
-from flask.ext.login import login_user
-from flask.ext.login import logout_user
-from flask.ext.login import login_required
+from flask_login import current_user
+from flask_login import login_user
+from flask_login import logout_user
+from flask_login import login_required
 
 from forms.reset_password import ResetPasswordForm
 from main import app, db
@@ -32,11 +32,11 @@ import requests
 def api_login():
     form = forms.auth.Login(request.form, csrf_enabled=False)
     if not form.validate():
-        utils.abort(httplib.BAD_REQUEST, errors=form.errors)
+        utils.abort(http.HTTPStatus.BAD_REQUEST, errors=form.errors)
 
     user = controller.login(form.name.data, form.password.data, form.remember.data)
     if user is None:
-        utils.abort(httplib.NOT_FOUND)
+        utils.abort(http.HTTPStatus.NOT_FOUND)
 
     return utils.jsonify(user=user.encode(mode=schema.user.EncodeMode.mine))
 
@@ -45,12 +45,12 @@ def api_login():
 def api_register():
     form = forms.auth.Signup(request.form, csrf_enabled=False)
     if not form.validate():
-        utils.abort(httplib.BAD_REQUEST, errors=form.errors)
+        utils.abort(http.HTTPStatus.BAD_REQUEST, errors=form.errors)
 
     # register by form
     user = controller.register(form)
 
-    return utils.jsonify(httplib.CREATED, user=user.encode(mode=schema.user.EncodeMode.mine))
+    return utils.jsonify(http.HTTPStatus.CREATED, user=user.encode(mode=schema.user.EncodeMode.mine))
 
 
 
@@ -127,7 +127,7 @@ def confirm_email(token):
     email = controller.confirm_token(token, current_user.user.salt)
     if email is None:
         flask.flash('The confirmation link is invalid or has expired.', 'danger')
-        flask.abort(httplib.FORBIDDEN)
+        flask.abort(http.HTTPStatus.FORBIDDEN)
 
     # some validation
     user = schema.user.User.get_by_email(email)
@@ -160,19 +160,19 @@ def confirm_reset_password():
     confirm_email = controller.confirm_token(token, app.config['AUTH_RESET_SALT'])
     if confirm_email is None:
         flask.flash('The confirmation link is invalid or has expired.', 'danger')
-        flask.abort(httplib.FORBIDDEN)
+        flask.abort(http.HTTPStatus.FORBIDDEN)
 
     # hmm... security issue
     if confirm_email != email:
         logging.error("Someone tried reseting with mismatched email: %s != %s", confirm_email, email)
         flask.flash('The confirmation link is invalid or has expired.', 'danger')
-        flask.abort(httplib.FORBIDDEN)
+        flask.abort(http.HTTPStatus.FORBIDDEN)
 
     # lookup user
     user = schema.user.User.get_by_email(email)
     if user is None:
         flask.flash('Invalid email')
-        flask.abort(httplib.BAD_REQUEST)
+        flask.abort(http.HTTPStatus.BAD_REQUEST)
 
     # generate the url
     url = flask.url_for('confirm_reset_password', token=token, email=email)
@@ -195,7 +195,7 @@ def confirm_reset_password():
 def linkedin_confirm():
     csrf = flask.request.args.get('state')
     if not flask_wtf.csrf.validate_csrf(csrf):
-        app.abort(httplib.FORBIDDEN)
+        app.abort(http.HTTPStatus.FORBIDDEN)
 
     # linkedin athentication code
     code = flask.request.args.get('code')
@@ -331,4 +331,3 @@ def change_password():
 def _login_user(user, remember=True):
     logged_in_user = CurrentUser(user)
     login_user(logged_in_user, remember=remember)
-
