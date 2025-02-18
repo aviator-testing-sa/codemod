@@ -4,7 +4,6 @@
  * MIT License
  */
 
-
 /*!
  * EventEmitter v4.2.6 - git.io/ee
  * Oliver Caldwell
@@ -13,256 +12,253 @@
  */
 
 (function () {
-	
+  /**
+   * Class for managing events.
+   * Can be extended to provide event functionality in other classes.
+   *
+   * @class EventEmitter Manages event registering and emitting.
+   */
+  function EventEmitter() {}
 
-	/**
-	 * Class for managing events.
-	 * Can be extended to provide event functionality in other classes.
-	 *
-	 * @class EventEmitter Manages event registering and emitting.
-	 */
-	function EventEmitter() {}
+  // Shortcuts to improve speed and size
+  var proto = EventEmitter.prototype;
+  var exports = this;
+  var originalGlobalValue = exports.EventEmitter;
 
-	// Shortcuts to improve speed and size
-	var proto = EventEmitter.prototype;
-	var exports = this;
-	var originalGlobalValue = exports.EventEmitter;
+  /**
+   * Finds the index of the listener for the event in it's storage array.
+   *
+   * @param {Function[]} listeners Array of listeners to search through.
+   * @param {Function} listener Method to look for.
+   * @return {Number} Index of the specified listener, -1 if not found
+   * @api private
+   */
+  function indexOfListener(listeners, listener) {
+    var i = listeners.length;
+    while (i--) {
+      if (listeners[i].listener === listener) {
+        return i;
+      }
+    }
 
-	/**
-	 * Finds the index of the listener for the event in it's storage array.
-	 *
-	 * @param {Function[]} listeners Array of listeners to search through.
-	 * @param {Function} listener Method to look for.
-	 * @return {Number} Index of the specified listener, -1 if not found
-	 * @api private
-	 */
-	function indexOfListener(listeners, listener) {
-		var i = listeners.length;
-		while (i--) {
-			if (listeners[i].listener === listener) {
-				return i;
-			}
-		}
+    return -1;
+  }
 
-		return -1;
-	}
+  /**
+   * Alias a method while keeping the context correct, to allow for overwriting of target method.
+   *
+   * @param {String} name The name of the target method.
+   * @return {Function} The aliased method
+   * @api private
+   */
+  function alias(name) {
+    return function aliasClosure() {
+      return this[name].apply(this, arguments);
+    };
+  }
 
-	/**
-	 * Alias a method while keeping the context correct, to allow for overwriting of target method.
-	 *
-	 * @param {String} name The name of the target method.
-	 * @return {Function} The aliased method
-	 * @api private
-	 */
-	function alias(name) {
-		return function aliasClosure() {
-			return this[name].apply(this, arguments);
-		};
-	}
+  /**
+   * Returns the listener array for the specified event.
+   * Will initialise the event object and listener arrays if required.
+   * Will return an object if you use a regex search. The object contains keys for each matched event. So /ba[rz]/ might return an object containing bar and baz. But only if you have either defined them with defineEvent or added some listeners to them.
+   * Each property in the object response is an array of listener functions.
+   *
+   * @param {String|RegExp} evt Name of the event to return the listeners from.
+   * @return {Function[]|Object} All listener functions for the event.
+   */
+  proto.getListeners = function getListeners(evt) {
+    var events = this._getEvents();
+    var response;
+    var key;
 
-	/**
-	 * Returns the listener array for the specified event.
-	 * Will initialise the event object and listener arrays if required.
-	 * Will return an object if you use a regex search. The object contains keys for each matched event. So /ba[rz]/ might return an object containing bar and baz. But only if you have either defined them with defineEvent or added some listeners to them.
-	 * Each property in the object response is an array of listener functions.
-	 *
-	 * @param {String|RegExp} evt Name of the event to return the listeners from.
-	 * @return {Function[]|Object} All listener functions for the event.
-	 */
-	proto.getListeners = function getListeners(evt) {
-		var events = this._getEvents();
-		var response;
-		var key;
+    // Return a concatenated array of all matching events if
+    // the selector is a regular expression.
+    if (typeof evt === 'object') {
+      response = {};
+      for (key in events) {
+        if (events.hasOwnProperty(key) && evt.test(key)) {
+          response[key] = events[key];
+        }
+      }
+    } else {
+      response = events[evt] || (events[evt] = []);
+    }
 
-		// Return a concatenated array of all matching events if
-		// the selector is a regular expression.
-		if (typeof evt === 'object') {
-			response = {};
-			for (key in events) {
-				if (events.hasOwnProperty(key) && evt.test(key)) {
-					response[key] = events[key];
-				}
-			}
-		}
-		else {
-			response = events[evt] || (events[evt] = []);
-		}
+    return response;
+  };
 
-		return response;
-	};
+  /**
+   * Takes a list of listener objects and flattens it into a list of listener functions.
+   *
+   * @param {Object[]} listeners Raw listener objects.
+   * @return {Function[]} Just the listener functions.
+   */
+  proto.flattenListeners = function flattenListeners(listeners) {
+    var flatListeners = [];
+    var i;
 
-	/**
-	 * Takes a list of listener objects and flattens it into a list of listener functions.
-	 *
-	 * @param {Object[]} listeners Raw listener objects.
-	 * @return {Function[]} Just the listener functions.
-	 */
-	proto.flattenListeners = function flattenListeners(listeners) {
-		var flatListeners = [];
-		var i;
+    for (i = 0; i < listeners.length; i += 1) {
+      flatListeners.push(listeners[i].listener);
+    }
 
-		for (i = 0; i < listeners.length; i += 1) {
-			flatListeners.push(listeners[i].listener);
-		}
+    return flatListeners;
+  };
 
-		return flatListeners;
-	};
+  /**
+   * Fetches the requested listeners via getListeners but will always return the results inside an object. This is mainly for internal use but others may find it useful.
+   *
+   * @param {String|RegExp} evt Name of the event to return the listeners from.
+   * @return {Object} All listener functions for an event in an object.
+   */
+  proto.getListenersAsObject = function getListenersAsObject(evt) {
+    var listeners = this.getListeners(evt);
+    var response;
 
-	/**
-	 * Fetches the requested listeners via getListeners but will always return the results inside an object. This is mainly for internal use but others may find it useful.
-	 *
-	 * @param {String|RegExp} evt Name of the event to return the listeners from.
-	 * @return {Object} All listener functions for an event in an object.
-	 */
-	proto.getListenersAsObject = function getListenersAsObject(evt) {
-		var listeners = this.getListeners(evt);
-		var response;
+    if (listeners instanceof Array) {
+      response = {};
+      response[evt] = listeners;
+    }
 
-		if (listeners instanceof Array) {
-			response = {};
-			response[evt] = listeners;
-		}
+    return response || listeners;
+  };
 
-		return response || listeners;
-	};
+  /**
+   * Adds a listener function to the specified event.
+   * The listener will not be added if it is a duplicate.
+   * If the listener returns true then it will be removed after it is called.
+   * If you pass a regular expression as the event name then the listener will be added to all events that match it.
+   *
+   * @param {String|RegExp} evt Name of the event to attach the listener to.
+   * @param {Function} listener Method to be called when the event is emitted. If the function returns true then it will be removed after calling.
+   * @return {Object} Current instance of EventEmitter for chaining.
+   */
+  proto.addListener = function addListener(evt, listener) {
+    var listeners = this.getListenersAsObject(evt);
+    var listenerIsWrapped = typeof listener === 'object';
+    var key;
 
-	/**
-	 * Adds a listener function to the specified event.
-	 * The listener will not be added if it is a duplicate.
-	 * If the listener returns true then it will be removed after it is called.
-	 * If you pass a regular expression as the event name then the listener will be added to all events that match it.
-	 *
-	 * @param {String|RegExp} evt Name of the event to attach the listener to.
-	 * @param {Function} listener Method to be called when the event is emitted. If the function returns true then it will be removed after calling.
-	 * @return {Object} Current instance of EventEmitter for chaining.
-	 */
-	proto.addListener = function addListener(evt, listener) {
-		var listeners = this.getListenersAsObject(evt);
-		var listenerIsWrapped = typeof listener === 'object';
-		var key;
+    for (key in listeners) {
+      if (listeners.hasOwnProperty(key) && indexOfListener(listeners[key], listener) === -1) {
+        listeners[key].push(listenerIsWrapped ? listener : {
+          listener: listener,
+          once: false
+        });
+      }
+    }
 
-		for (key in listeners) {
-			if (listeners.hasOwnProperty(key) && indexOfListener(listeners[key], listener) === -1) {
-				listeners[key].push(listenerIsWrapped ? listener : {
-					listener: listener,
-					once: false
-				});
-			}
-		}
+    return this;
+  };
 
-		return this;
-	};
+  /**
+   * Alias of addListener
+   */
+  proto.on = alias('addListener');
 
-	/**
-	 * Alias of addListener
-	 */
-	proto.on = alias('addListener');
+  /**
+   * Semi-alias of addListener. It will add a listener that will be
+   * automatically removed after it's first execution.
+   *
+   * @param {String|RegExp} evt Name of the event to attach the listener to.
+   * @param {Function} listener Method to be called when the event is emitted. If the function returns true then it will be removed after calling.
+   * @return {Object} Current instance of EventEmitter for chaining.
+   */
+  proto.addOnceListener = function addOnceListener(evt, listener) {
+    return this.addListener(evt, {
+      listener: listener,
+      once: true
+    });
+  };
 
-	/**
-	 * Semi-alias of addListener. It will add a listener that will be
-	 * automatically removed after it's first execution.
-	 *
-	 * @param {String|RegExp} evt Name of the event to attach the listener to.
-	 * @param {Function} listener Method to be called when the event is emitted. If the function returns true then it will be removed after calling.
-	 * @return {Object} Current instance of EventEmitter for chaining.
-	 */
-	proto.addOnceListener = function addOnceListener(evt, listener) {
-		return this.addListener(evt, {
-			listener: listener,
-			once: true
-		});
-	};
+  /**
+   * Alias of addOnceListener.
+   */
+  proto.once = alias('addOnceListener');
 
-	/**
-	 * Alias of addOnceListener.
-	 */
-	proto.once = alias('addOnceListener');
+  /**
+   * Defines an event name. This is required if you want to use a regex to add a listener to multiple events at once. If you don't do this then how do you expect it to know what event to add to? Should it just add to every possible match for a regex? No. That is scary and bad.
+   * You need to tell it what event names should be matched by a regex.
+   *
+   * @param {String} evt Name of the event to create.
+   * @return {Object} Current instance of EventEmitter for chaining.
+   */
+  proto.defineEvent = function defineEvent(evt) {
+    this.getListeners(evt);
+    return this;
+  };
 
-	/**
-	 * Defines an event name. This is required if you want to use a regex to add a listener to multiple events at once. If you don't do this then how do you expect it to know what event to add to? Should it just add to every possible match for a regex? No. That is scary and bad.
-	 * You need to tell it what event names should be matched by a regex.
-	 *
-	 * @param {String} evt Name of the event to create.
-	 * @return {Object} Current instance of EventEmitter for chaining.
-	 */
-	proto.defineEvent = function defineEvent(evt) {
-		this.getListeners(evt);
-		return this;
-	};
+  /**
+   * Uses defineEvent to define multiple events.
+   *
+   * @param {String[]} evts An array of event names to define.
+   * @return {Object} Current instance of EventEmitter for chaining.
+   */
+  proto.defineEvents = function defineEvents(evts) {
+    for (var i = 0; i < evts.length; i += 1) {
+      this.defineEvent(evts[i]);
+    }
+    return this;
+  };
 
-	/**
-	 * Uses defineEvent to define multiple events.
-	 *
-	 * @param {String[]} evts An array of event names to define.
-	 * @return {Object} Current instance of EventEmitter for chaining.
-	 */
-	proto.defineEvents = function defineEvents(evts) {
-		for (var i = 0; i < evts.length; i += 1) {
-			this.defineEvent(evts[i]);
-		}
-		return this;
-	};
+  /**
+   * Removes a listener function from the specified event.
+   * When passed a regular expression as the event name, it will remove the listener from all events that match it.
+   *
+   * @param {String|RegExp} evt Name of the event to remove the listener from.
+   * @param {Function} listener Method to remove from the event.
+   * @return {Object} Current instance of EventEmitter for chaining.
+   */
+  proto.removeListener = function removeListener(evt, listener) {
+    var listeners = this.getListenersAsObject(evt);
+    var index;
+    var key;
 
-	/**
-	 * Removes a listener function from the specified event.
-	 * When passed a regular expression as the event name, it will remove the listener from all events that match it.
-	 *
-	 * @param {String|RegExp} evt Name of the event to remove the listener from.
-	 * @param {Function} listener Method to remove from the event.
-	 * @return {Object} Current instance of EventEmitter for chaining.
-	 */
-	proto.removeListener = function removeListener(evt, listener) {
-		var listeners = this.getListenersAsObject(evt);
-		var index;
-		var key;
+    for (key in listeners) {
+      if (listeners.hasOwnProperty(key)) {
+        index = indexOfListener(listeners[key], listener);
 
-		for (key in listeners) {
-			if (listeners.hasOwnProperty(key)) {
-				index = indexOfListener(listeners[key], listener);
+        if (index !== -1) {
+          listeners[key].splice(index, 1);
+        }
+      }
+    }
 
-				if (index !== -1) {
-					listeners[key].splice(index, 1);
-				}
-			}
-		}
+    return this;
+  };
 
-		return this;
-	};
+  /**
+   * Alias of removeListener
+   */
+  proto.off = alias('removeListener');
 
-	/**
-	 * Alias of removeListener
-	 */
-	proto.off = alias('removeListener');
+  /**
+   * Adds listeners in bulk using the manipulateListeners method.
+   * If you pass an object as the second argument you can add to multiple events at once. The object should contain key value pairs of events and listeners or listener arrays. You can also pass it an event name and an array of listeners to be added.
+   * You can also pass it a regular expression to add the array of listeners to all events that match it.
+   * Yeah, this function does quite a bit. That's probably a bad thing.
+   *
+   * @param {String|Object|RegExp} evt An event name if you will pass an array of listeners next. An object if you wish to add to multiple events at once.
+   * @param {Function[]} [listeners] An optional array of listener functions to add.
+   * @return {Object} Current instance of EventEmitter for chaining.
+   */
+  proto.addListeners = function addListeners(evt, listeners) {
+    // Pass through to manipulateListeners
+    return this.manipulateListeners(false, evt, listeners);
+  };
 
-	/**
-	 * Adds listeners in bulk using the manipulateListeners method.
-	 * If you pass an object as the second argument you can add to multiple events at once. The object should contain key value pairs of events and listeners or listener arrays. You can also pass it an event name and an array of listeners to be added.
-	 * You can also pass it a regular expression to add the array of listeners to all events that match it.
-	 * Yeah, this function does quite a bit. That's probably a bad thing.
-	 *
-	 * @param {String|Object|RegExp} evt An event name if you will pass an array of listeners next. An object if you wish to add to multiple events at once.
-	 * @param {Function[]} [listeners] An optional array of listener functions to add.
-	 * @return {Object} Current instance of EventEmitter for chaining.
-	 */
-	proto.addListeners = function addListeners(evt, listeners) {
-		// Pass through to manipulateListeners
-		return this.manipulateListeners(false, evt, listeners);
-	};
-
-	/**
-	 * Removes listeners in bulk using the manipulateListeners method.
-	 * If you pass an object as the second argument you can remove from multiple events at once. The object should contain key value pairs of events and listeners or listener arrays.
-	 * You can also pass it an event name and an array of listeners to be removed.
-	 * You can also pass it a regular expression to remove the listeners from all events that match it.
-	 *
-	 * @param {String|Object|RegExp} evt An event name if you will pass an array of listeners next. An object if you wish to remove from multiple events at once.
-	 * @param {Function[]} [listeners] An optional array of listener functions to remove.
-	 * @return {Object} Current instance of EventEmitter for chaining.
-	 */
-	proto.removeListeners = function removeListeners(evt, listeners) {
-		// Pass through to manipulateListeners
-		return this.manipulateListeners(true, evt, listeners);
-	};
+  /**
+   * Removes listeners in bulk using the manipulateListeners method.
+   * If you pass an object as the second argument you can remove from multiple events at once. The object should contain key value pairs of events and listeners or listener arrays.
+   * You can also pass it an event name and an array of listeners to be removed.
+   * You can also pass it a regular expression to remove the listeners from all events that match it.
+   *
+   * @param {String|Object|RegExp} evt An event name if you will pass an array of listeners next. An object if you wish to remove from multiple events at once.
+   * @param {Function[]} [listeners] An optional array of listener functions to remove.
+   * @return {Object} Current instance of EventEmitter for chaining.
+   */
+  proto.removeListeners = function removeListeners(evt, listeners) {
+    // Pass through to manipulateListeners
+    return this.manipulateListeners(true, evt, listeners);
+  };
 
 	/**
 	 * Edits listeners in bulk. The addListeners and removeListeners methods both use this to do their job. You should really use those instead, this is a little lower level.
@@ -608,7 +604,9 @@ var hasConsole = typeof console !== 'undefined';
 // extend objects
 function extend( a, b ) {
   for ( var prop in b ) {
-    a[ prop ] = b[ prop ];
+    if (Object.hasOwn(b, prop)) {
+      a[ prop ] = b[ prop ];
+    }
   }
   return a;
 }
@@ -624,7 +622,7 @@ function makeArray( obj ) {
   if ( isArray( obj ) ) {
     // use object if already an array
     ary = obj;
-  } else if ( typeof obj.length === 'number' ) {
+  } else if ( typeof obj?.length === 'number' ) {
     // convert nodeList to array
     for ( var i=0, len = obj.length; i < len; i++ ) {
       ary.push( obj[i] );
@@ -858,7 +856,7 @@ function makeArray( obj ) {
   // trigger specified handler for event type
   Resource.prototype.handleEvent = function( event ) {
     var method = 'on' + event.type;
-    if ( this[ method ] ) {
+    if ( typeof this[ method ] === 'function') {
       this[ method ]( event );
     }
   };

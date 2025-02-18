@@ -3,6 +3,7 @@
  *
  */
 
+// Assuming modal and cropper are still external dependencies and don't need migration
 var modal = require('./modal');
 var cropper = require('./cropper');
 

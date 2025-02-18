@@ -49,7 +49,7 @@
             }, 1000);
         }
         if (self.options.success) {
-            self.$modal.find('.btn-primary').click(self.options.success);
+            self.$modal.find('.btn-primary').off('click').on('click', self.options.success);
         }
         self.$modal.modal("show");
     },
@@ -94,4 +94,3 @@
         return false;
     });
 })(jQuery);
-
