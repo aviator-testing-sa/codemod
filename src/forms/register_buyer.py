@@ -1,4 +1,4 @@
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import PasswordField
 from wtforms import TextField
 from wtforms import RadioField
@@ -7,7 +7,7 @@ from wtforms.fields.html5 import EmailField
 import common
 
 
-class RegisterBuyer(Form):
+class RegisterBuyer(FlaskForm):
     slug = common.SlugField()
     email = EmailField()
     fullname = TextField()
@@ -18,4 +18,3 @@ class RegisterBuyer(Form):
     angellist = TextField()
     twitter = TextField()
     facebook = TextField()
-

@@ -1,5 +1,5 @@
 import datetime
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import validators
 from wtforms import BooleanField
 from wtforms import DateField
@@ -7,7 +7,7 @@ from wtforms import TextAreaField
 from wtforms import TextField
 
 
-class EditListing(Form):
+class EditListing(FlaskForm):
     name = TextField(validators=[validators.InputRequired()])
     domain = TextField(validators=[validators.InputRequired()])
     app_ios = BooleanField()
@@ -28,4 +28,3 @@ class EditListing(Form):
     linkedin = TextField()
     angellist = TextField()
     crunchbase = TextField()
-
