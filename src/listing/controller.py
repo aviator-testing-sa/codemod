@@ -1,6 +1,7 @@
 import datetime
 import errors
 import sqlalchemy
+from sqlalchemy import select, desc, func
 
 from schema.activity import Activity
 from schema.auction import Auction
@@ -12,20 +13,25 @@ import utils
 
 
 def get_listing(listing_id):
-    listing = Listing.query.get_or_404(int(listing_id))
+    listing = db.session.get(Listing, int(listing_id))
+    if listing is None:
+        raise errors.NotFoundError("Listing not found")
     if listing.active:
         return listing
     raise errors.InvalidValueError("Cannot access listing")
 
 def get_auction(auction_id):
-    auction = Auction.query.get_or_404(int(auction_id))
+    auction = db.session.get(Auction, int(auction_id))
+    if auction is None:
+        raise errors.NotFoundError("Auction not found")
     if auction.active:
         return auction
     raise errors.InvalidValueError("Cannot access auction")
 
 def get_latest_auction(listing_id):
-    auctions = Auction.query.filter_by(listingid=int(listing_id)).filter_by(active=True) \
-        .order_by(Auction.id.desc()).all()
+    stmt = select(Auction).where(Auction.listingid == int(listing_id), Auction.active == True)\
+        .order_by(desc(Auction.id))
+    auctions = db.session.execute(stmt).scalars().all()
     return auctions[0] if auctions else None
 
 
@@ -146,9 +152,9 @@ def delete_listing(user, listing):
 
 def ensure_auction_active():
     # Update all expired auctions
-    today = datetime.datetime.utcnow().date
-    auctions = Auction.query.filter_by(active=True).filter_by(status='started') \
-        .filter(Auction.expiration < today).all()
+    today = datetime.datetime.utcnow().date()
+    stmt = select(Auction).where(Auction.active == True, Auction.status == 'started', Auction.expiration < today)
+    auctions = db.session.execute(stmt).scalars().all()
     for auction in auctions:
         auction.status = 'expired'
     db.session.commit()
@@ -181,7 +187,8 @@ def ensure_listing_slug(name, current_slug=''):
     base_slug = utils.slugify(name)
     if current_slug == base_slug:
         return base_slug
-    listings = Listing.query.filter(Listing.slug.ilike(base_slug + '%')).all()
+    stmt = select(Listing).filter(func.lower(Listing.slug).like(base_slug + '%'))
+    listings = db.session.execute(stmt).scalars().all()
     if listings:
         var = 1
         slugs = [listing.slug for listing in listings]
@@ -209,38 +216,46 @@ def build_search_listing(string, asmatch=False, order="-updated", limit=50, offs
                 return qry.filter(attr != v)
             return qry.filter(attr == v)
 
-        if v.startswith("~"):
-            return qry.filter(~attr.in_(v))
-        return qry.filter(attr.in_(v))
+        if isinstance(v, str) and v.startswith("~"):
+             return qry.filter(attr != v[1:])
+
+        if isinstance(v, (tuple, list)):
+            if isinstance(v[0], str) and v[0].startswith("~"):
+                return qry.filter(~attr.in_([item[1:] if isinstance(item, str) and item.startswith("~") else item for item in v]))
+            return qry.filter(attr.in_(v))
+        return qry.filter(attr == v)
 
     # build query
-    qry = db.session.query(cls)
-    for k,v in filters.iteritems():
+    qry = select(cls)
+    for k,v in filters.items():
         qry = filter(qry, k, v)
-
     # build search string
     if string is not None:
         f1 = cls.filter_like_name(string, asmatch=asmatch)
         f2 = cls.filter_like_category(string, asmatch=asmatch)
         f3 = cls.filter_like_domain(string, asmatch=asmatch)
-        qry = qry.filter(f1 | f2 | f3)
+        qry = qry.where(f1 | f2 | f3)
 
     # build ordering
     if order is not None:
-        if isinstance(order, basestring):
-            order = order,
+        if isinstance(order, str):
+            order = (order,)
+        order_clauses = []
         for o in order:
-            attr = getattr(cls, o)
+            attr = getattr(cls, o.lstrip("-"))
             if o.startswith("-"):
-                qry = qry.order_by(attr.desc())
+                order_clauses.append(desc(attr))
             else:
-                qry = qry.order_by(attr)
+                order_clauses.append(attr)
+        if order_clauses:
+            qry = qry.order_by(*order_clauses)
 
     # limit & offset
+    stmt = qry
     if limit is not None:
-        qry = qry.limit(limit)
+        stmt = stmt.limit(limit)
 
     if offset > 0:
-        qry = qry.offset(offset)
+        stmt = stmt.offset(offset)
 
-    return qry
+    return db.session.execute(stmt).scalars()
