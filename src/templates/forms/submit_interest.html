@@ -3,11 +3,11 @@
   <fieldset class="col-xs-11 col-md-8 col-centered">
     <div>The message below will be sent to: <strong>{{ auction.user.fullname }}</strong></div>
     <div class="form-group">
-        {{ form.text(class="form-control", rows="3", placeholder="Enter text here...") }}
+        <textarea class="form-control" rows="3" placeholder="Enter text here..." name="text"></textarea>
     </div>
     <div>
       <div class="errors" id="errors">{{ error }}</div>
-      {{ form.hidden_tag() }}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </div>
   </fieldset>
 </form>
