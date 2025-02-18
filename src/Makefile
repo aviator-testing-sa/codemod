@@ -12,7 +12,7 @@ default :
 .PHONY : venv
 venv : $(VENV)
 $(VENV) :
-	virtualenv $(VENV)
+	python -m venv $(VENV)
 
 .PHONY : install
 install :

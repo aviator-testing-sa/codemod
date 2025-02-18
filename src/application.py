@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
-
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 if __name__ == '__main__':
     os.environ['APP_CONFIG_FILE'] = '../config/dev.cfg'
@@ -12,6 +13,10 @@ from main import app
 application = app
 app.secret_key = app.config['APP_SECRET']
 
+# SQLAlchemy 2.x style engine creation
+engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])  # Ensure you have this config
+Session = sessionmaker(bind=engine)
+app.db_session = Session  # Attach the session to the app context
 
 if __name__ == '__main__':
     @app.before_first_request
@@ -29,8 +34,3 @@ if __name__ == '__main__':
 
 
     app.run(debug=True)
-
-
-
-
-

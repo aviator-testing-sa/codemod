@@ -7,7 +7,8 @@ import os
 import pytest
 import main
 import sqlalchemy
-
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 
 #TESTDB = 'test_project.db'
 #TESTDB_PATH = "/tmp/{}".format(TESTDB)
@@ -43,31 +44,26 @@ def mail(app, mailserver, request):
     return mail
 
 
-@pytest.yield_fixture(scope='function')
-def session(db, request):
+@pytest.fixture(scope='function')
+def session(db):
     """Creates a new database session for a test."""
     connection = db.engine.connect()
     transaction = connection.begin()
 
-    options = dict(bind=connection, binds={})
-    session = db.create_scoped_session(options=options)
+    session = Session(bind=connection)
 
-    session.begin_nested()
+    nested = connection.begin_nested()
 
-    # session is actually a scoped_session
-    # for the `after_transaction_end` event, we need a session instance to
-    # listen for, hence the `session()` call
-    @sqlalchemy.event.listens_for(session(), 'after_transaction_end')
-    def restart_savepoint(sess, trans):
-        if trans.nested and not trans._parent.nested:
+    @event.listens_for(session.connection(), "after_transaction_end")
+    def end_savepoint(conn, transaction):
+        if transaction.nested and not transaction._parent.nested:
             session.expire_all()
-            session.begin_nested()
+            connection.begin_nested()
 
     db.session = session
-
     yield session
 
-    session.remove()
+    session.close()
     transaction.rollback()
     connection.close()
 
@@ -79,4 +75,3 @@ def client(session):
     """
     with main.app.test_client() as client:
         yield client
-
