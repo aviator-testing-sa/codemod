@@ -1,7 +1,3 @@
-#
-#
-#
-#
 from main import db
 import schema
 
@@ -12,6 +8,5 @@ def test_new_user(session):
     session.add(user)
     session.commit()
 
-    u2 = schema.user.User.get_by_slug("testmeN")
+    u2 = session.execute(schema.user.User.select().where(schema.user.User.slug == "testmeN")).scalar_one()
     assert user.slug == u2.slug
-
