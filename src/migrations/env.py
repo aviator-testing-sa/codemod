@@ -1,7 +1,7 @@
 from __future__ import with_statement
 import alembic
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 from logging.config import fileConfig
 import logging
 
@@ -42,7 +42,7 @@ def run_migrations_offline():
 
     """
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url)
+    context.configure(url=url, target_metadata=target_metadata)  # Added target_metadata
 
     with context.begin_transaction():
         context.run_migrations()
@@ -66,21 +66,18 @@ def run_migrations_online():
                 directives[:] = []
                 logger.info('No changes in schema detected.')
 
-    engine = engine_from_config(config.get_section(config.config_ini_section),
-                                prefix='sqlalchemy.',
-                                poolclass=pool.NullPool)
+    connectable = create_engine(current_app.config.get('SQLALCHEMY_DATABASE_URI'), poolclass=pool.NullPool)
 
-    connection = engine.connect()
-    context.configure(connection=connection,
-                      target_metadata=target_metadata,
-                      process_revision_directives=process_revision_directives,
-                      **current_app.extensions['migrate'].configure_args)
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            process_revision_directives=process_revision_directives,
+            **current_app.extensions['migrate'].configure_args
+        )
 
-    try:
-        with context.begin_transaction():
-            context.run_migrations()
-    finally:
-        connection.close()
+        context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()
