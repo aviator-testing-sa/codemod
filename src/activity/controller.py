@@ -2,6 +2,8 @@ import errors
 from main import db
 from schema.activity import Activity
 from schema.auction import Auction
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 def create_bid(user, auction, form):
@@ -37,19 +39,28 @@ def submit_interest(user, auction, form):
 
 
 def get_activities(auction):
-    return Activity.query.filter_by(auctionid=auction.id).filter_by(active=True).all()
+    with Session(db.engine) as session:
+        activities = session.execute(
+            select(Activity).filter_by(auctionid=auction.id, active=True)
+        ).scalars().all()
+    return activities
 
 
 def get_auction(auction_id):
-    auction = Auction.query.get_or_404(int(auction_id))
-    if auction.active:
-        return auction
-    raise errors.InvalidValueError("Cannot access auction")
+    with Session(db.engine) as session:
+        auction = session.get(Auction, int(auction_id))
+        if not auction:
+            raise errors.NotFound("Auction not found")
+        if auction.active:
+            return auction
+        raise errors.InvalidValueError("Cannot access auction")
 
 
 def get_activity(activity_id):
-    activity = Activity.query.get_or_404(int(activity_id))
-    if activity.active:
-        return activity
-    raise errors.InvalidValueError("Cannot access activity")
-
+    with Session(db.engine) as session:
+        activity = session.get(Activity, int(activity_id))
+        if not activity:
+            raise errors.NotFound("Activity not found")
+        if activity.active:
+            return activity
+        raise errors.InvalidValueError("Cannot access activity")
