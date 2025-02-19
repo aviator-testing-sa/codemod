@@ -1,7 +1,3 @@
-#
-# user/controller.py
-#
-#
 import logging
 
 from main import db
@@ -9,7 +5,6 @@ import forms
 import forms.user
 import schema
 from upload import uploader
-
 
 
 def get_edit_form(type, user=None):
@@ -29,7 +24,7 @@ def update(user, form):
     data = dict(form.data)
     data.pop('image')
 
-    for k,v in data.iteritems():
+    for k, v in data.items():
         setattr(user, k, v)
 
     if form.image.data:
@@ -40,4 +35,3 @@ def update(user, form):
         user.image = uploader.s3_upload(form.image.data)
 
     db.session.commit()
-

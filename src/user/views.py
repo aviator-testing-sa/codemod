@@ -3,10 +3,10 @@
 #
 #
 import flask
-import httplib
+import http
 
-from flask.ext.login import login_required
-from flask.ext.login import current_user
+from flask_login import login_required
+from flask_login import current_user
 
 import controller
 from main import app
@@ -33,7 +33,7 @@ def get_user_public_profile(slug):
 
     user = schema.user.User.get_by_slug(slug)
     if user is None:
-        flask.abort(httplib.NOT_FOUND)
+        flask.abort(http.HTTPStatus.NOT_FOUND)
 
     return flask.render_template("public-profile.html", user=user)
 
@@ -44,7 +44,7 @@ def get_edit_account():
     user = current_user.user
     form = controller.get_edit_form(user.type, user)
     if form is None:
-        flask.abort(httplib.BAD_REQUEST)
+        flask.abort(http.HTTPStatus.BAD_REQUEST)
     return flask.render_template("forms/edit-account.html",
             user=user, form=form, stripe_key=app.config['STRIPE_PUB_KEY'])
 
