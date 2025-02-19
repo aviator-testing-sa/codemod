@@ -4,14 +4,15 @@
 #
 import datetime
 
-from main import db
+from sqlalchemy import Column, Integer, Boolean, DateTime
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.sql import func
 
-class Base(db.Model):
+
+class Base(DeclarativeBase):
     __abstract__ = True
 
-    id = db.Column(db.Integer, primary_key=True)
-    active = db.Column(db.Boolean, default=True)
-    created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    updated = db.Column(db.DateTime, default=datetime.datetime.utcnow,
-        onupdate=datetime.datetime.utcnow)
-
+    id = Column(Integer, primary_key=True)
+    active = Column(Boolean, default=True)
+    created = Column(DateTime, default=datetime.datetime.utcnow)
+    updated = Column(DateTime, default=datetime.datetime.utcnow, onupdate=func.now())
