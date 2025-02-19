@@ -7,16 +7,17 @@ Create Date: ${create_date}
 """
 
 # revision identifiers, used by Alembic.
-revision = ${repr(up_revision)}
-down_revision = ${repr(down_revision)}
+revision: str = ${repr(up_revision)}
+down_revision: str | None = ${repr(down_revision)}
 
 from alembic import op
 import sqlalchemy as sa
 ${imports if imports else ""}
 
-def upgrade():
+
+def upgrade() -> None:
     ${upgrades if upgrades else "pass"}
 
 
-def downgrade():
+def downgrade() -> None:
     ${downgrades if downgrades else "pass"}

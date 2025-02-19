@@ -1,1 +1,46 @@
-Generic single-database configuration.
+# Generic single-database configuration.
+# SQLAlchemy 2.x encourages the use of a single Engine object
+# for each database.  The Engine is a connection pool and a
+# dialect combined into one object.
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+# Replace 'sqlite:///:memory:' with your database URL.
+# For example, 'postgresql://user:password@host:port/database'
+engine = create_engine('sqlite:///:memory:')
+
+# Create a Session class.  This is a factory for Session objects.
+# In SQLAlchemy 2.x, the Session is created using sessionmaker,
+# which is then configured with the engine.  The bind argument
+# is no longer used directly when creating sessions.
+Session = sessionmaker(bind=engine)
+
+# To create a session:
+# session = Session()  # No more bind=engine here.
+# ... use the session ...
+# session.close()
+
+# OR, use a context manager for automatic session management:
+# with Session() as session:
+#     ... use the session ...  # Session is automatically closed when exiting the block
+
+# The MetaData object is used to store Table objects.
+# This pattern is the same as in SQLAlchemy 1.x
+from sqlalchemy import MetaData
+metadata = MetaData()
+
+
+# Example usage of metadata (same as SQLAlchemy 1.x)
+from sqlalchemy import Table, Column, Integer, String
+users_table = Table('users', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('name', String),
+)
+
+# To create the tables in the database (same as SQLAlchemy 1.x)
+metadata.create_all(engine)
+
+
+# Note:  In SQLAlchemy 2.x, you can also use the `async_sessionmaker`
+# and `AsyncEngine` for asynchronous operations using asyncio.
