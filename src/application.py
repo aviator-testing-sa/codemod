@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import os
 
-
 if __name__ == '__main__':
     os.environ['APP_CONFIG_FILE'] = '../config/dev.cfg'
 else:
@@ -10,7 +9,7 @@ else:
 from main import app
 
 application = app
-app.secret_key = app.config['APP_SECRET']
+app.config['SECRET_KEY'] = app.config['APP_SECRET']
 
 
 if __name__ == '__main__':
@@ -29,8 +28,3 @@ if __name__ == '__main__':
 
 
     app.run(debug=True)
-
-
-
-
-
