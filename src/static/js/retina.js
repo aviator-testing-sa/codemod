@@ -1,5 +1,5 @@
 /*!
- * Retina.js v1.3.0
+ * Retina.js v1.3.0 (Modified for Modern Compatibility)
  *
  * Copyright 2014 Imulus, LLC
  * Released under the MIT license
@@ -9,10 +9,10 @@
  */
 
 (function() {
-    var root = (typeof exports === 'undefined' ? window : exports);
-    var config = {
+    const root = (typeof exports === 'undefined' ? window : exports);
+    const config = {
         // An option to choose a suffix for 2x images
-        retinaImageSuffix : '@2x',
+        retinaImageSuffix: '@2x',
 
         // Ensure Content-Type is an image before trying to load @2x image
         // https://github.com/imulus/retinajs/pull/45)
@@ -28,11 +28,11 @@
     root.Retina = Retina;
 
     Retina.configure = function(options) {
-        if (options === null) {
+        if (!options) {
             options = {};
         }
 
-        for (var prop in options) {
+        for (const prop in options) {
             if (options.hasOwnProperty(prop)) {
                 config[prop] = options[prop];
             }
@@ -40,17 +40,18 @@
     };
 
     Retina.init = function(context) {
-        if (context === null) {
+        if (!context) {
             context = root;
         }
 
-        var existing_onload = context.onload || function(){};
+        const existing_onload = context.onload || function() {};
 
         context.onload = function() {
-            var images = document.getElementsByTagName('img'), retinaImages = [], i, image;
-            for (i = 0; i < images.length; i += 1) {
-                image = images[i];
-                if (!!!image.getAttributeNode('data-no-retina')) {
+            const images = document.getElementsByTagName('img');
+            const retinaImages = [];
+            for (let i = 0; i < images.length; i++) {
+                const image = images[i];
+                if (!image.getAttribute('data-no-retina')) {
                     retinaImages.push(new RetinaImage(image));
                 }
             }
@@ -58,8 +59,8 @@
         };
     };
 
-    Retina.isRetina = function(){
-        var mediaQuery = '(-webkit-min-device-pixel-ratio: 1.5), (min--moz-device-pixel-ratio: 1.5), (-o-min-device-pixel-ratio: 3/2), (min-resolution: 1.5dppx)';
+    Retina.isRetina = function() {
+        const mediaQuery = '(-webkit-min-device-pixel-ratio: 1.5), (min--moz-device-pixel-ratio: 1.5), (-o-min-device-pixel-ratio: 3/2), (min-resolution: 1.5dppx)';
 
         if (root.devicePixelRatio > 1) {
             return true;
@@ -73,7 +74,7 @@
     };
 
 
-    var regexMatch = /\.\w+$/;
+    const regexMatch = /\.\w+$/;
     function suffixReplace (match) {
         return config.retinaImageSuffix + match;
     }
@@ -84,13 +85,13 @@
             this.at_2x_path = at_2x_path;
             this.perform_check = false;
         } else {
-            if (undefined !== document.createElement) {
-                var locationObject = document.createElement('a');
+            if (typeof document.createElement !== 'undefined') {
+                const locationObject = document.createElement('a');
                 locationObject.href = this.path;
                 locationObject.pathname = locationObject.pathname.replace(regexMatch, suffixReplace);
                 this.at_2x_path = locationObject.href;
             } else {
-                var parts = this.path.split('?');
+                const parts = this.path.split('?');
                 parts[0] = parts[0].replace(regexMatch, suffixReplace);
                 this.at_2x_path = parts.join('?');
             }
@@ -107,24 +108,21 @@
     };
 
     RetinaImagePath.prototype.check_2x_variant = function(callback) {
-        var http, that = this;
+        const that = this;
         if (this.is_external()) {
             return callback(false);
         } else if (!this.perform_check && typeof this.at_2x_path !== 'undefined' && this.at_2x_path !== null) {
             return callback(true);
-        } else if (this.at_2x_path in RetinaImagePath.confirmed_paths) {
+        } else if (RetinaImagePath.confirmed_paths.includes(this.at_2x_path)) {
             return callback(true);
         } else {
-            http = new XMLHttpRequest();
+            const http = new XMLHttpRequest();
             http.open('HEAD', this.at_2x_path);
-            http.onreadystatechange = function() {
-                if (http.readyState !== 4) {
-                    return callback(false);
-                }
 
-                if (http.status >= 200 && http.status <= 399) {
+            http.onload = function() {
+                if (http.status >= 200 && http.status <= 299) { // Modernized status check
                     if (config.check_mime_type) {
-                        var type = http.getResponseHeader('Content-Type');
+                        const type = http.getResponseHeader('Content-Type');
                         if (type === null || !type.match(/^image/i)) {
                             return callback(false);
                         }
@@ -136,6 +134,11 @@
                     return callback(false);
                 }
             };
+
+            http.onerror = function() {  // Handle network errors
+                return callback(false);
+            };
+
             http.send();
         }
     };
@@ -144,7 +147,7 @@
     function RetinaImage(el) {
         this.el = el;
         this.path = new RetinaImagePath(this.el.getAttribute('src'), this.el.getAttribute('data-at2x'));
-        var that = this;
+        const that = this;
         this.path.check_2x_variant(function(hasVariant) {
             if (hasVariant) {
                 that.swap();
@@ -159,7 +162,7 @@
             path = this.path.at_2x_path;
         }
 
-        var that = this;
+        const that = this;
         function load() {
             if (! that.el.complete) {
                 setTimeout(load, 5);

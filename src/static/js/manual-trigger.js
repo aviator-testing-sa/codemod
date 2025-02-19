@@ -20,7 +20,7 @@
 				instance = this;
 
 			// Bind nextSelector link to retrieve
-			$(opts.nextSelector).click(function(e) {
+			$(opts.nextSelector).on('click', function(e) {
 				if (e.which == 1 && !e.metaKey && !e.shiftKey) {
 					e.preventDefault();
 					instance.retrieve();

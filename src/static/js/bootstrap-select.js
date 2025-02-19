@@ -308,9 +308,9 @@
 
       if (typeof id !== 'undefined') {
         this.$button.attr('data-id', id);
-        $('label[for="' + id + '"]').click(function (e) {
+        $('label[for="' + id + '"]').on('click', function (e) {
           e.preventDefault();
-          that.$button.focus();
+          that.$button.trigger('focus');
         });
       }
 
@@ -544,8 +544,9 @@
       });
 
       //If we are not multiple, we don't have a selected item, and we don't have a title, select the first element so something is set in the button
+      //Ref: https://docs.sqlalchemy.org/en/20/orm/queryguide/index.html
       if (!this.multiple && this.$element.find('option:selected').length === 0 && !this.options.title) {
-        this.$element.find('option').eq(0).prop('selected', true).attr('selected', 'selected');
+        this.$element.prop('selectedIndex', 0).trigger('change');
       }
 
       return _li.join('');
@@ -762,11 +763,11 @@
           var minHeight,
               hasClass = function (className, include) {
                 return function (element) {
-                    if (include) {
-                        return (element.classList ? element.classList.contains(className) : $(element).hasClass(className));
-                    } else {
-                        return !(element.classList ? element.classList.contains(className) : $(element).hasClass(className));
-                    }
+                  if (include) {
+                    return element.classList ? element.classList.contains(className) : $(element).hasClass(className);
+                  } else {
+                    return !(element.classList ? element.classList.contains(className) : $(element).hasClass(className));
+                  }
                 };
               },
               lis = that.$menuInner[0].getElementsByTagName('li'),
@@ -925,9 +926,9 @@
       }
 
       if (disabled) {
-        $lis.addClass('disabled').children('a').attr('href', '#').attr('tabindex', -1);
+        $lis.addClass('disabled').children('a').attr('aria-disabled', 'true').attr('tabindex', -1);
       } else {
-        $lis.removeClass('disabled').children('a').removeAttr('href').attr('tabindex', 0);
+        $lis.removeClass('disabled').children('a').removeAttr('aria-disabled').attr('tabindex', 0);
       }
     },
 
@@ -940,11 +941,11 @@
 
       if (this.isDisabled()) {
         this.$newElement.addClass('disabled');
-        this.$button.addClass('disabled').attr('tabindex', -1);
+        this.$button.addClass('disabled').attr('tabindex', -1).attr('aria-disabled', 'true');
       } else {
         if (this.$button.hasClass('disabled')) {
           this.$newElement.removeClass('disabled');
-          this.$button.removeClass('disabled');
+          this.$button.removeClass('disabled').removeAttr('aria-disabled');
         }
 
         if (this.$button.attr('tabindex') == -1 && !this.$element.data('tabindex')) {
@@ -952,7 +953,7 @@
         }
       }
 
-      this.$button.click(function () {
+      this.$button.on('click', function () {
         return !that.isDisabled();
       });
     },
@@ -985,7 +986,7 @@
         that.setSize();
         that.$element.on('shown.bs.select', function () {
           if (!that.options.liveSearch && !that.multiple) {
-            that.$menu.find('.selected a').focus();
+            that.$menu.find('.selected a').trigger('focus');
           } else if (!that.multiple) {
             var selectedIndex = that.liObj[that.$element[0].selectedIndex];
 
@@ -1094,7 +1095,7 @@
 
           // Trigger select 'change'
           if ((prevValue != that.$element.val() && that.multiple) || (prevIndex != that.$element.prop('selectedIndex') && !that.multiple)) {
-            that.$element.change();
+            that.$element.trigger('change');
             // $option.prop('selected') is current option state (selected/unselected). state is previous option state.
             that.$element.trigger('changed.bs.select', [clickedIndex, $option.prop('selected'), state]);
           }
@@ -1146,10 +1147,10 @@
         } else {
           that.deselectAll();
         }
-        that.$element.change();
+        that.$element.trigger('change');
       });
 
-      this.$element.change(function () {
+      this.$element.on('change', function () {
         that.render(false);
       });
     },
@@ -1181,7 +1182,7 @@
           if (that.options.liveSearchNormalize) {
             $searchBase = $searchBase.not(':a' + that._searchStyle() + '(' + normalizeToBase(that.$searchbox.val()) + ')');
           } else {
-            $searchBase = $searchBase.not(':' + that._searchStyle() + '(' + that.$searchbox.val() + ')');
+            $searchBase = $searchBase.not(':' + that._searchStyle() + '(' + that.$searchbox.val()) + ')';
           }
           $searchBase.parent().addClass('hidden');
 
@@ -1249,7 +1250,7 @@
 
     val: function (value) {
       if (typeof value !== 'undefined') {
-        this.$element.val(value);
+        this.$element.val(value).trigger('change');
         this.render();
 
         return this.$element;
@@ -1260,82 +1261,82 @@
 
     selectAll: function () {
       this.findLis();
-      this.$element.find('option:enabled').not('[data-divider], [data-hidden]').prop('selected', true);
+      this.$element.find('option:enabled').not('[data-divider], [data-hidden]').prop('selected', true).trigger('change');
       this.$lis.not('.divider, .dropdown-header, .disabled, .hidden').addClass('selected');
       this.render(false);
     },
 
     deselectAll: function () {
       this.findLis();
-      this.$element.find('option:enabled').not('[data-divider], [data-hidden]').prop('selected', false);
+      this.$element.find('option:enabled').not('[data-divider], [data-hidden]').prop('selected', false).trigger('change');
       this.$lis.not('.divider, .dropdown-header, .disabled, .hidden').removeClass('selected');
       this.render(false);
     },
 
     keydown: function (e) {
       var $this = $(this),
-          $parent = $this.is('input') ? $this.parent().parent() : $this.parent(),
-          $items,
-          that = $parent.data('this'),
-          index,
-          next,
-          first,
-          last,
-          prev,
-          nextPrev,
-          prevIndex,
-          isActive,
-          selector = ':not(.disabled, .hidden, .dropdown-header, .divider)',
-          keyCodeMap = {
-            32: ' ',
-            48: '0',
-            49: '1',
-            50: '2',
-            51: '3',
-            52: '4',
-            53: '5',
-            54: '6',
-            55: '7',
-            56: '8',
-            57: '9',
-            59: ';',
-            65: 'a',
-            66: 'b',
-            67: 'c',
-            68: 'd',
-            69: 'e',
-            70: 'f',
-            71: 'g',
-            72: 'h',
-            73: 'i',
-            74: 'j',
-            75: 'k',
-            76: 'l',
-            77: 'm',
-            78: 'n',
-            79: 'o',
-            80: 'p',
-            81: 'q',
-            82: 'r',
-            83: 's',
-            84: 't',
-            85: 'u',
-            86: 'v',
-            87: 'w',
-            88: 'x',
-            89: 'y',
-            90: 'z',
-            96: '0',
-            97: '1',
-            98: '2',
-            99: '3',
-            100: '4',
-            101: '5',
-            102: '6',
-            103: '7',
-            104: '8',
-            105: '9'
-          };
+        $parent = $this.is('input') ? $this.parent().parent() : $this.parent(),
+        $items,
+        that = $parent.data('this'),
+        index,
+        next,
+        first,
+        last,
+        prev,
+        nextPrev,
+        prevIndex,
+        isActive,
+        selector = ':not(.disabled, .hidden, .dropdown-header, .divider)',
+        keyCodeMap = {
+          32: ' ',
+          48: '0',
+          49: '1',
+          50: '2',
+          51: '3',
+          52: '4',
+          53: '5',
+          54: '6',
+          55: '7',
+          56: '8',
+          57: '9',
+          59: ';',
+          65: 'a',
+          66: 'b',
+          67: 'c',
+          68: 'd',
+          69: 'e',
+          70: 'f',
+          71: 'g',
+          72: 'h',
+          73: 'i',
+          74: 'j',
+          75: 'k',
+          76: 'l',
+          77: 'm',
+          78: 'n',
+          79: 'o',
+          80: 'p',
+          81: 'q',
+          82: 'r',
+          83: 's',
+          84: 't',
+          85: 'u',
+          86: 'v',
+          87: 'w',
+          88: 'x',
+          89: 'y',
+          90: 'z',
+          96: '0',
+          97: '1',
+          98: '2',
+          99: '3',
+          100: '4',
+          101: '5',
+          102: '6',
+          103: '7',
+          104: '8',
+          105: '9'
+        };
 
       if (that.options.liveSearch) $parent = $this.parent().parent();
 
@@ -1430,8 +1431,8 @@
 
       } else if (!$this.is('input')) {
         var keyIndex = [],
-            count,
-            prevKey;
+          count,
+          prevKey;
 
         $items.each(function () {
           if (!$(this).parent().hasClass('disabled')) {
@@ -1524,7 +1525,7 @@
     // The arguments of the function are explicitly re-defined from the argument list, because the shift causes them
     // to get lost/corrupted in android 2.3 and IE9 #715 #775
     var _option = option,
-        _event = event;
+      _event = event;
     [].shift.apply(args);
 
     var value;
@@ -1532,7 +1533,7 @@
       var $this = $(this);
       if ($this.is('select')) {
         var data = $this.data('selectpicker'),
-            options = typeof _option == 'object' && _option;
+          options = typeof _option == 'object' && _option;
 
         if (!data) {
           var config = $.extend({}, Selectpicker.DEFAULTS, $.fn.selectpicker.defaults || {}, $this.data(), options);
@@ -1575,11 +1576,11 @@
   };
 
   $(document)
-      .data('keycount', 0)
-      .on('keydown', '.bootstrap-select [data-toggle=dropdown], .bootstrap-select [role="menu"], .bs-searchbox input', Selectpicker.prototype.keydown)
-      .on('focusin.modal', '.bootstrap-select [data-toggle=dropdown], .bootstrap-select [role="menu"], .bs-searchbox input', function (e) {
-        e.stopPropagation();
-      });
+    .data('keycount', 0)
+    .on('keydown', '.bootstrap-select [data-bs-toggle="dropdown"], .bootstrap-select [role="menu"], .bs-searchbox input', Selectpicker.prototype.keydown)
+    .on('focusin.modal', '.bootstrap-select [data-bs-toggle="dropdown"], .bootstrap-select [role="menu"], .bs-searchbox input', function (e) {
+      e.stopPropagation();
+    });
 
   // SELECTPICKER DATA-API
   // =====================

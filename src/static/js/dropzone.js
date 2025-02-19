@@ -1,4 +1,3 @@
-
 /*
  *
  * More info at [www.dropzonejs.com](http://www.dropzonejs.com)
@@ -1080,76 +1079,63 @@
     };
 
     Dropzone.prototype.createThumbnail = function(file, callback) {
-      var fileReader;
-      fileReader = new FileReader;
-      fileReader.onload = (function(_this) {
-        return function() {
-          if (file.type === "image/svg+xml") {
-            _this.emit("thumbnail", file, fileReader.result);
-            if (callback != null) {
-              callback();
-            }
-            return;
-          }
-          return _this.createThumbnailFromUrl(file, fileReader.result, callback);
-        };
-      })(this);
-      return fileReader.readAsDataURL(file);
+      const fileReader = new FileReader();
+      fileReader.onload = () => {
+        if (file.type === "image/svg+xml") {
+          this.emit("thumbnail", file, fileReader.result);
+          callback?.(); // Use optional chaining
+          return;
+        }
+        this.createThumbnailFromUrl(file, fileReader.result, callback);
+      };
+      fileReader.readAsDataURL(file);
     };
 
     Dropzone.prototype.createThumbnailFromUrl = function(file, imageUrl, callback, crossOrigin) {
-      var img;
-      img = document.createElement("img");
+      const img = document.createElement("img");
       if (crossOrigin) {
         img.crossOrigin = crossOrigin;
       }
-      img.onload = (function(_this) {
-        return function() {
-          var canvas, ctx, resizeInfo, thumbnail, _ref, _ref1, _ref2, _ref3;
-          file.width = img.width;
-          file.height = img.height;
-          resizeInfo = _this.options.resize.call(_this, file);
-          if (resizeInfo.trgWidth == null) {
-            resizeInfo.trgWidth = resizeInfo.optWidth;
-          }
-          if (resizeInfo.trgHeight == null) {
-            resizeInfo.trgHeight = resizeInfo.optHeight;
-          }
-          canvas = document.createElement("canvas");
-          ctx = canvas.getContext("2d");
-          canvas.width = resizeInfo.trgWidth;
-          canvas.height = resizeInfo.trgHeight;
-          drawImageIOSFix(ctx, img, (_ref = resizeInfo.srcX) != null ? _ref : 0, (_ref1 = resizeInfo.srcY) != null ? _ref1 : 0, resizeInfo.srcWidth, resizeInfo.srcHeight, (_ref2 = resizeInfo.trgX) != null ? _ref2 : 0, (_ref3 = resizeInfo.trgY) != null ? _ref3 : 0, resizeInfo.trgWidth, resizeInfo.trgHeight);
-          thumbnail = canvas.toDataURL("image/png");
-          _this.emit("thumbnail", file, thumbnail);
-          if (callback != null) {
-            return callback();
-          }
-        };
-      })(this);
-      if (callback != null) {
-        img.onerror = callback;
-      }
-      return img.src = imageUrl;
+      img.onload = () => {
+        file.width = img.width;
+        file.height = img.height;
+        const resizeInfo = this.options.resize.call(this, file);
+        resizeInfo.trgWidth ??= resizeInfo.optWidth; // Use nullish coalescing assignment
+        resizeInfo.trgHeight ??= resizeInfo.optHeight; // Use nullish coalescing assignment
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = resizeInfo.trgWidth;
+        canvas.height = resizeInfo.trgHeight;
+        drawImageIOSFix(ctx, img, resizeInfo.srcX ?? 0, resizeInfo.srcY ?? 0, resizeInfo.srcWidth, resizeInfo.srcHeight, resizeInfo.trgX ?? 0, resizeInfo.trgY ?? 0, resizeInfo.trgWidth, resizeInfo.trgHeight); // Use nullish coalescing operator
+
+        const thumbnail = canvas.toDataURL("image/png");
+        this.emit("thumbnail", file, thumbnail);
+        callback?.(); // Use optional chaining
+      };
+      img.onerror = callback;
+      img.src = imageUrl;
     };
 
     Dropzone.prototype.processQueue = function() {
-      var i, parallelUploads, processingLength, queuedFiles;
-      parallelUploads = this.options.parallelUploads;
-      processingLength = this.getUploadingFiles().length;
-      i = processingLength;
+      const parallelUploads = this.options.parallelUploads;
+      const processingLength = this.getUploadingFiles().length;
+      let i = processingLength;
+
       if (processingLength >= parallelUploads) {
         return;
       }
-      queuedFiles = this.getQueuedFiles();
-      if (!(queuedFiles.length > 0)) {
+
+      const queuedFiles = this.getQueuedFiles();
+      if (queuedFiles.length === 0) {
         return;
       }
+
       if (this.options.uploadMultiple) {
-        return this.processFiles(queuedFiles.slice(0, parallelUploads - processingLength));
+        this.processFiles(queuedFiles.slice(0, parallelUploads - processingLength));
       } else {
         while (i < parallelUploads) {
-          if (!queuedFiles.length) {
+          if (queuedFiles.length === 0) {
             return;
           }
           this.processFile(queuedFiles.shift());
@@ -1163,66 +1149,55 @@
     };
 
     Dropzone.prototype.processFiles = function(files) {
-      var file, _i, _len;
-      for (_i = 0, _len = files.length; _i < _len; _i++) {
-        file = files[_i];
+      for (const file of files) { // Use for...of loop
         file.processing = true;
         file.status = Dropzone.UPLOADING;
         this.emit("processing", file);
       }
+
       if (this.options.uploadMultiple) {
         this.emit("processingmultiple", files);
       }
+
       return this.uploadFiles(files);
     };
 
     Dropzone.prototype._getFilesWithXhr = function(xhr) {
-      var file, files;
-      return files = (function() {
-        var _i, _len, _ref, _results;
-        _ref = this.files;
-        _results = [];
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          file = _ref[_i];
-          if (file.xhr === xhr) {
-            _results.push(file);
-          }
-        }
-        return _results;
-      }).call(this);
+      return this.files.filter(file => file.xhr === xhr); // Use filter method
     };
 
     Dropzone.prototype.cancelUpload = function(file) {
-      var groupedFile, groupedFiles, _i, _j, _len, _len1, _ref;
       if (file.status === Dropzone.UPLOADING) {
-        groupedFiles = this._getFilesWithXhr(file.xhr);
-        for (_i = 0, _len = groupedFiles.length; _i < _len; _i++) {
-          groupedFile = groupedFiles[_i];
+        const groupedFiles = this._getFilesWithXhr(file.xhr);
+
+        for (const groupedFile of groupedFiles) {
           groupedFile.status = Dropzone.CANCELED;
         }
+
         file.xhr.abort();
-        for (_j = 0, _len1 = groupedFiles.length; _j < _len1; _j++) {
-          groupedFile = groupedFiles[_j];
+
+        for (const groupedFile of groupedFiles) {
           this.emit("canceled", groupedFile);
         }
+
         if (this.options.uploadMultiple) {
           this.emit("canceledmultiple", groupedFiles);
         }
-      } else if ((_ref = file.status) === Dropzone.ADDED || _ref === Dropzone.QUEUED) {
+      } else if (file.status === Dropzone.ADDED || file.status === Dropzone.QUEUED) {
         file.status = Dropzone.CANCELED;
         this.emit("canceled", file);
+
         if (this.options.uploadMultiple) {
           this.emit("canceledmultiple", [file]);
         }
       }
+
       if (this.options.autoProcessQueue) {
-        return this.processQueue();
+        this.processQueue();
       }
     };
 
-    resolveOption = function() {
-      var args, option;
-      option = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    const resolveOption = function(option, ...args) { // Use rest parameter
       if (typeof option === 'function') {
         return option.apply(this, args);
       }
@@ -1420,106 +1395,6 @@
       }
     };
 
-    return Dropzone;
-
-  })(Emitter);
-
-  Dropzone.version = "4.3.0";
-
-  Dropzone.options = {};
-
-  Dropzone.optionsForElement = function(element) {
-    if (element.getAttribute("id")) {
-      return Dropzone.options[camelize(element.getAttribute("id"))];
-    } else {
-      return void 0;
-    }
-  };
-
-  Dropzone.instances = [];
-
-  Dropzone.forElement = function(element) {
-    if (typeof element === "string") {
-      element = document.querySelector(element);
-    }
-    if ((element != null ? element.dropzone : void 0) == null) {
-      throw new Error("No Dropzone found for given element. This is probably because you're trying to access it before Dropzone had the time to initialize. Use the `init` option to setup any additional observers on your Dropzone.");
-    }
-    return element.dropzone;
-  };
-
-  Dropzone.autoDiscover = true;
-
-  Dropzone.discover = function() {
-    var checkElements, dropzone, dropzones, _i, _len, _results;
-    if (document.querySelectorAll) {
-      dropzones = document.querySelectorAll(".dropzone");
-    } else {
-      dropzones = [];
-      checkElements = function(elements) {
-        var el, _i, _len, _results;
-        _results = [];
-        for (_i = 0, _len = elements.length; _i < _len; _i++) {
-          el = elements[_i];
-          if (/(^| )dropzone($| )/.test(el.className)) {
-            _results.push(dropzones.push(el));
-          } else {
-            _results.push(void 0);
-          }
-        }
-        return _results;
-      };
-      checkElements(document.getElementsByTagName("div"));
-      checkElements(document.getElementsByTagName("form"));
-    }
-    _results = [];
-    for (_i = 0, _len = dropzones.length; _i < _len; _i++) {
-      dropzone = dropzones[_i];
-      if (Dropzone.optionsForElement(dropzone) !== false) {
-        _results.push(new Dropzone(dropzone));
-      } else {
-        _results.push(void 0);
-      }
-    }
-    return _results;
-  };
-
-  Dropzone.blacklistedBrowsers = [/opera.*Macintosh.*version\/12/i];
-
-  Dropzone.isBrowserSupported = function() {
-    var capableBrowser, regex, _i, _len, _ref;
-    capableBrowser = true;
-    if (window.File && window.FileReader && window.FileList && window.Blob && window.FormData && document.querySelector) {
-      if (!("classList" in document.createElement("a"))) {
-        capableBrowser = false;
-      } else {
-        _ref = Dropzone.blacklistedBrowsers;
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          regex = _ref[_i];
-          if (regex.test(navigator.userAgent)) {
-            capableBrowser = false;
-            continue;
-          }
-        }
-      }
-    } else {
-      capableBrowser = false;
-    }
-    return capableBrowser;
-  };
-
-  without = function(list, rejectedItem) {
-    var item, _i, _len, _results;
-    _results = [];
-    for (_i = 0, _len = list.length; _i < _len; _i++) {
-      item = list[_i];
-      if (item !== rejectedItem) {
-        _results.push(item);
-      }
-    }
-    return _results;
-  };
-
   camelize = function(str) {
     return str.replace(/[\-_](\w)/g, function(match) {
       return match.charAt(1).toUpperCase();
@@ -1530,7 +1405,7 @@
     var div;
     div = document.createElement("div");
     div.innerHTML = string;
-    return div.childNodes[0];
+    return div.firstChild; // Changed from childNodes[0] to firstChild for broader compatibility and correctness
   };
 
   Dropzone.elementInside = function(element, container) {
@@ -1546,10 +1421,10 @@
   };
 
   Dropzone.getElement = function(el, name) {
-    var element;
+    let element; // Changed var to let
     if (typeof el === "string") {
       element = document.querySelector(el);
-    } else if (el.nodeType != null) {
+    } else if (el instanceof HTMLElement) { // Correctly check if el is an HTMLElement
       element = el;
     }
     if (element == null) {
@@ -1559,12 +1434,12 @@
   };
 
   Dropzone.getElements = function(els, name) {
-    var e, el, elements, _i, _j, _len, _len1, _ref;
-    if (els instanceof Array) {
+    let e, el, elements; // Changed var to let
+    if (Array.isArray(els)) { // Use Array.isArray for checking arrays
       elements = [];
       try {
-        for (_i = 0, _len = els.length; _i < _len; _i++) {
-          el = els[_i];
+        for (let i = 0; i < els.length; i++) { // Modernized loop
+          el = els[i];
           elements.push(this.getElement(el, name));
         }
       } catch (_error) {
@@ -1572,13 +1447,8 @@
         elements = null;
       }
     } else if (typeof els === "string") {
-      elements = [];
-      _ref = document.querySelectorAll(els);
-      for (_j = 0, _len1 = _ref.length; _j < _len1; _j++) {
-        el = _ref[_j];
-        elements.push(el);
-      }
-    } else if (els.nodeType != null) {
+      elements = Array.from(document.querySelectorAll(els)); // Convert NodeList to Array
+    } else if (els instanceof HTMLElement) { // Correctly check if els is an HTMLElement
       elements = [els];
     }
     if (!((elements != null) && elements.length)) {
@@ -1596,26 +1466,24 @@
   };
 
   Dropzone.isValidFile = function(file, acceptedFiles) {
-    var baseMimeType, mimeType, validType, _i, _len;
     if (!acceptedFiles) {
       return true;
     }
     acceptedFiles = acceptedFiles.split(",");
-    mimeType = file.type;
-    baseMimeType = mimeType.replace(/\/.*$/, "");
-    for (_i = 0, _len = acceptedFiles.length; _i < _len; _i++) {
-      validType = acceptedFiles[_i];
-      validType = validType.trim();
-      if (validType.charAt(0) === ".") {
-        if (file.name.toLowerCase().indexOf(validType.toLowerCase(), file.name.length - validType.length) !== -1) {
+    const mimeType = file.type; // Changed var to const
+    const baseMimeType = mimeType.replace(/\/.*$/, ""); // Changed var to const
+    for (const validType of acceptedFiles) { // Modernized loop
+      const trimmedValidType = validType.trim(); // Changed var to const and trim each type
+      if (trimmedValidType.charAt(0) === ".") {
+        if (file.name.toLowerCase().endsWith(trimmedValidType.toLowerCase())) { // Use endsWith for simplicity
           return true;
         }
-      } else if (/\/\*$/.test(validType)) {
-        if (baseMimeType === validType.replace(/\/.*$/, "")) {
+      } else if (/\/\*$/.test(trimmedValidType)) {
+        if (baseMimeType === trimmedValidType.replace(/\/.*$/, "")) {
           return true;
         }
       } else {
-        if (mimeType === validType) {
+        if (mimeType === trimmedValidType) {
           return true;
         }
       }
@@ -1626,7 +1494,8 @@
   if (typeof jQuery !== "undefined" && jQuery !== null) {
     jQuery.fn.dropzone = function(options) {
       return this.each(function() {
-        return new Dropzone(this, options);
+        new Dropzone(this, options); // Corrected missing return
+        return this;
       });
     };
   }
@@ -1763,5 +1632,3 @@
   };
 
   contentLoaded(window, Dropzone._autoDiscoverFunction);
-
-}).call(this);

@@ -35,7 +35,7 @@
         slider.currentSlide = vars.startAt;
         slider.animatingTo = slider.currentSlide;
         slider.atEnd = (slider.currentSlide === 0 || slider.currentSlide === slider.last);
-        slider.containerSelector = vars.selector.substr(0,vars.selector.search(' '));
+        slider.containerSelector = vars.selector.substring(0,vars.selector.indexOf(' '));
         slider.slides = $(vars.selector, slider);
         slider.container = $(slider.containerSelector, slider);
         slider.count = slider.slides.length;
@@ -87,7 +87,7 @@
         
         // KEYBOARD:
         if (vars.keyboard && ($(slider.containerSelector).length === 1 || vars.multipleKeyboard)) {
-          $(document).bind('keyup', function(event) {
+          $(document).on('keyup', function(event) {
             var keycode = event.keyCode;
             if (!slider.animating && (keycode === 39 || keycode === 37)) {
               var target = (keycode === 39) ? slider.getTarget('next') :
@@ -98,7 +98,7 @@
         }
         // MOUSEWHEEL:
         if (vars.mousewheel) {
-          slider.bind('mousewheel', function(event, delta, deltaX, deltaY) {
+          slider.on('mousewheel', function(event, delta, deltaX, deltaY) {
             event.preventDefault();
             var target = (delta < 0) ? slider.getTarget('next') : slider.getTarget('prev');
             slider.flexAnimate(target, vars.pauseOnAction);
@@ -125,7 +125,7 @@
         if (touch && vars.touch) methods.touch();
         
         // FADE&&SMOOTHHEIGHT || SLIDE:
-        if (!fade || (fade && vars.smoothHeight)) $(window).bind("resize focus", methods.resize);
+        if (!fade || (fade && vars.smoothHeight)) $(window).on("resize focus", methods.resize);
         
         
         // API: start() Callback
@@ -139,7 +139,7 @@
           slider.animatingTo = Math.floor(slider.currentSlide/slider.move);
           slider.currentItem = slider.currentSlide;
           slider.slides.removeClass(namespace + "active-slide").eq(slider.currentItem).addClass(namespace + "active-slide");
-          slider.slides.click(function(e){
+          slider.slides.on('click', function(e){
             e.preventDefault();
             var $slide = $(this),
                 target = $slide.index();
@@ -179,7 +179,7 @@
           
           methods.controlNav.active();
         
-          slider.controlNavScaffold.delegate('a, img', eventType, function(event) {
+          slider.controlNavScaffold.on(eventType, 'a, img', function(event) {
             event.preventDefault();
             var $this = $(this),
                 target = slider.controlNav.index($this);
@@ -191,7 +191,7 @@
           });
           // Prevent iOS click event bug
           if (touch) {
-            slider.controlNavScaffold.delegate('a', "click touchstart", function(event) {
+            slider.controlNavScaffold.on('click touchstart', 'a', function(event) {
               event.preventDefault();
             });
           }
@@ -200,7 +200,7 @@
           slider.controlNav = slider.manualControls;
           methods.controlNav.active();
           
-          slider.controlNav.live(eventType, function(event) {
+          slider.controlNav.on(eventType, function(event) {
             event.preventDefault();
             var $this = $(this),
                 target = slider.controlNav.index($this);
@@ -212,7 +212,7 @@
           });
           // Prevent iOS click event bug
           if (touch) {
-            slider.controlNav.live("click touchstart", function(event) {
+            slider.controlNav.on("click touchstart", function(event) {
               event.preventDefault();
             });
           }
@@ -251,14 +251,14 @@
         
           methods.directionNav.update();
         
-          slider.directionNav.bind(eventType, function(event) {
+          slider.directionNav.on(eventType, function(event) {
             event.preventDefault();
             var target = ($(this).hasClass(namespace + 'next')) ? slider.getTarget('next') : slider.getTarget('prev');
             slider.flexAnimate(target, vars.pauseOnAction);
           });
           // Prevent iOS click event bug
           if (touch) {
-            slider.directionNav.bind("click touchstart", function(event) {
+            slider.directionNav.on("click touchstart", function(event) {
               event.preventDefault();
             });
           }
@@ -294,7 +294,7 @@
           // slider.pausePlay.addClass(pausePlayState).text((pausePlayState == 'pause') ? vars.pauseText : vars.playText);
           methods.pausePlay.update((vars.slideshow) ? namespace + 'pause' : namespace + 'play');
         
-          slider.pausePlay.bind(eventType, function(event) {
+          slider.pausePlay.on(eventType, function(event) {
             event.preventDefault();
             if ($(this).hasClass(namespace + 'pause')) {
               slider.pause();
@@ -306,7 +306,7 @@
           });
           // Prevent iOS click event bug
           if (touch) {
-            slider.pausePlay.bind("click touchstart", function(event) {
+            slider.pausePlay.on("click touchstart", function(event) {
               event.preventDefault();
             });
           }
@@ -840,7 +840,6 @@
     removed: function(){}           //{NEW} Callback: function(slider) - Fires after a slide is removed
   }
 
-
   //FlexSlider: Plugin Function
   $.fn.flexslider = function(options) {
     options = options || {};
@@ -854,12 +853,15 @@
           $slides.fadeIn(400);
           if (options.start) options.start($this);
         } else if ($this.data('flexslider') === undefined) {
-          new $.flexslider(this, options);
+          $.data(this, 'flexslider', new $.flexslider(this, options));
         }
       });
     } else {
       // Helper strings to quickly perform functions on the slider
       var $slider = $(this).data('flexslider');
+      if (!$slider) {
+        return; // Or throw an error, or handle the case where flexslider isn't initialized
+      }
       switch (options) {
         case "play": $slider.play(); break;
         case "pause": $slider.pause(); break;
@@ -869,6 +871,5 @@
         default: if (typeof options === "number") $slider.flexAnimate(options, true);
       }
     }
-  }  
-
+  }
 })(jQuery);

@@ -1,5 +1,4 @@
 $(document).ready(function() {
-
 	$('#debug-trigger').click(function(e) {
 	
 		e.preventDefault();
@@ -16,7 +15,7 @@ $(document).ready(function() {
 			arg = $self.attr('data-arg'),
 			arg = arg || null;
 			
-			$('.content').infinitescroll(action,arg);
+			$('.content').infiniteScroll(action,arg);
 			
 	
 	});

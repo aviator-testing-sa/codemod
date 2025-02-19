@@ -265,6 +265,731 @@
 	};
 
 	/**
+	 * Edits listeners in bulk. The addListeners and removeListeners methods both use this to do their job. You should really use those instead of calling this directly.
+	 * Returns the modified instance of EventEmitter for chaining.
+	 *
+	 * @param {Boolean} remove True if you want to remove listeners, false if you want to add.
+	 * @param {String|Object|RegExp} evt An event name if you will pass an array of listeners next. An object if you wish to add to multiple events at once.
+	 * @param {Function[]} [listeners] An optional array of listener functions to add.
+	 * @return {Object} Current instance of EventEmitter for chaining.
+	 */
+	proto.manipulateListeners = function manipulateListeners(remove, evt, listeners) {
+		var i;
+		var value;
+		var single = remove ? this.removeListener : this.addListener;
+		var multiple = remove ? this.removeListeners : this.addListeners;
+
+		// If evt is an object then pass each of it's properties to this method
+		if (typeof evt === 'object' && !(evt instanceof RegExp)) {
+			for (i in evt) {
+				if (evt.hasOwnProperty(i) && (value = evt[i])) {
+					// Pass the single argument on to the multiple argument
+					multiple.call(this, i, value);
+				}
+			}
+		}
+		else {
+			// Otherwise pass on the single argument
+			listeners = [].concat(listeners);
+			for (i = 0; i < listeners.length; i += 1) {
+				single.call(this, evt, listeners[i]);
+			}
+		}
+
+		return this;
+	};
+
+	/**
+	 * Removes all listeners from a specified event.
+	 * If you do not specify an event then all listeners will be removed.
+	 * That's a little dangerous and probably not wise.
+	 *
+	 * @param {String|RegExp} evt Optional name of the event to remove all listeners for. Will remove from all events if not passed.
+	 * @return {Object} Current instance of EventEmitter for chaining.
+	 */
+	proto.removeEvent = function removeEvent(evt) {
+		var events = this._getEvents();
+		var key;
+
+		if (evt === false) {
+			// Remove all events
+			this._events = {};
+		}
+		else if (typeof evt === 'object') {
+			// Remove all events matching the regex.
+			for (key in events) {
+				if (events.hasOwnProperty(key) && evt.test(key)) {
+					delete events[key];
+				}
+			}
+		}
+		else {
+			// Remove the event listeners for the specified event.
+			delete events[evt];
+		}
+
+		return this;
+	};
+
+	/**
+	 * Alias of removeEvent.
+	 *
+	 * @param {String|RegExp} evt Optional name of the event to remove all listeners for. Will remove from all events if not passed.
+	 */
+	proto.removeAllListeners = alias('removeEvent');
+
+	/**
+	 * Emits an event of your choice.
+	 * When emitted, every listener attached to that event will be executed.
+	 * That's it, basically.
+	 *
+	 * @param {String} evt Name of the event to emit.
+	 * @param {Mixed} [args...] Optional additional arguments to pass to each listener.
+	 * @return {Object} Current instance of EventEmitter for chaining.
+	 */
+	proto.emitEvent = function emitEvent(evt, args) {
+		var listeners = this.getListenersAsObject(evt);
+		var listener;
+		var i;
+		var key;
+		var response;
+
+		for (key in listeners) {
+			if (listeners.hasOwnProperty(key)) {
+				i = listeners[key].length;
+
+				while (i--) {
+					listener = listeners[key][i];
+
+					if (listener) {
+						response = listener.listener.apply(this, args || []);
+
+						if (response === true || listener.once === true) {
+							this.removeListener(evt, listener.listener);
+						}
+					}
+				}
+			}
+		}
+
+		return this;
+	};
+
+	/**
+	 * Alias of emitEvent
+	 */
+	proto.trigger = alias('emitEvent');
+
+	/**
+	 * Subtly different from emitEvent in that it will pass its arguments on to the listeners, as opposed to wrapping them in an array.
+	 * Use this wisely.
+	 *
+	 * @param {String} evt Name of the event to emit.
+	 * @param {Mixed} [args...] Optional additional arguments to pass to each listener.
+	 * @return {Object} Current instance of EventEmitter for chaining.
+	 */
+	proto.emit = function emit(evt) {
+		var args = Array.prototype.slice.call(arguments, 1);
+		return this.emitEvent(evt, args);
+	};
+
+	/**
+	 * Sets the current value to use when accessing the events property.
+	 * The default value is '_events'.
+	 *
+	 * @param {String} value The new property name to use when accessing events.
+	 * @return {Object} Current instance of EventEmitter for chaining.
+	 */
+	proto.setEventName = function setEventName(value) {
+		this._eventName = value;
+		return this;
+	};
+
+	/**
+	 * Gets the name of the event that will be used when accessing the events property.
+	 *
+	 * @return {String} The name of the property that will be used when accessing events.
+	 */
+	proto.getEventName = function getEventName() {
+		return this._eventName || '_events';
+	};
+
+	/**
+	 * Gets the list of listeners for a certain event.
+	 * Uses the getEventName function to find the correct event.
+	 *
+	 * @return {Object} The event container.
+	 */
+	proto._getEvents = function _getEvents() {
+		return this[this.getEventName()] || (this[this.getEventName()] = {});
+	};
+
+	/**
+	 * Reverts the global {@link EventEmitter} to its previous value and returns a reference to this version.
+	 *
+	 * @return {Function} Non conflicting EventEmitter class.
+	 */
+	EventEmitter.noConflict = function noConflict() {
+		exports.EventEmitter = originalGlobalValue;
+		return EventEmitter;
+	};
+
+	// Expose the class either via AMD, CommonJS or the global object
+	if (typeof define === 'function' && define.amd) {
+		define(function () {
+			return EventEmitter;
+		});
+	}
+	else if (typeof module === 'object' && module.exports){
+		module.exports = EventEmitter;
+	}
+	else {
+		exports.EventEmitter = EventEmitter;
+	}
+}.call(this));
+
+/*!
+ * eventie v1.0.5
+ * event binding helper
+ *   eventie.bind( elem, 'click', myFn )
+ *   eventie.unbind( elem, 'click', myFn )
+ * MIT license
+ */
+
+/*jshint browser: true, undef: true, unused: true */
+/*global define: false, module: false */
+
+( function( window ) {
+
+var docElem = document.documentElement;
+
+var bind = function() {};
+
+function getIEEvent( obj ) {
+  var event = window.event;
+  // add event.target
+  event.target = event.srcElement || obj;
+  return event;
+}
+
+if ( docElem.addEventListener ) {
+  bind = function( obj, type, fn ) {
+    obj.addEventListener( type, fn, false );
+  };
+} else if ( docElem.attachEvent ) {
+  bind = function( obj, type, fn ) {
+    obj[ type + fn ] = function() {
+      var event = getIEEvent( obj );
+      return fn.call( obj, event );
+    };
+    obj.attachEvent( 'on' + type, obj[ type + fn ] );
+  };
+}
+
+var unbind = function() {};
+
+if ( docElem.removeEventListener ) {
+  unbind = function( obj, type, fn ) {
+    obj.removeEventListener( type, fn, false );
+  };
+} else if ( docElem.detachEvent ) {
+  unbind = function( obj, type, fn ) {
+    try {
+      obj.detachEvent( 'on' + type, obj[ type + fn ] );
+    } catch ( ex ) {
+      // ignore IE non-error
+    }
+    delete obj[ type + fn ];
+  };
+}
+
+var eventie = {
+  bind: bind,
+  unbind: unbind
+};
+
+// transport
+if ( typeof define === 'function' && define.amd ) {
+  // AMD
+  define( eventie );
+} else if ( typeof exports === 'object' ) {
+  // CommonJS
+  module.exports = eventie;
+} else {
+  // browser global
+  window.eventie = eventie;
+}
+
+})( this );
+
+/*!
+ * getStyleProperty v1.0.4
+ * original by kangax
+ * http://perfectionkills.com/feature-testing-methods-for-dom-elements/#new-version-of-modernizr-dot-csstest
+ * MIT license
+ */
+
+/*jshint browser: true, undef: true, unused: true */
+/*global define: false, module: false */
+
+( function( window ) {
+
+var prefixes = 'Webkit Moz ms Ms O'.split(' ');
+var docElemStyle = document.documentElement.style;
+
+function getStyleProperty( propName ) {
+  if ( !propName ) {
+    return;
+  }
+
+  // test standard property first
+  if ( typeof docElemStyle[ propName ] === 'string' ) {
+    return propName;
+  }
+
+  // capitalize
+  propName = propName.charAt(0).toUpperCase() + propName.slice(1);
+
+  var prefixed;
+  for ( var i=0, len = prefixes.length; i < len; i++ ) {
+    prefixed = prefixes[i] + propName;
+    if ( typeof docElemStyle[ prefixed ] === 'string' ) {
+      return prefixed;
+    }
+  }
+}
+
+// transport
+if ( typeof define === 'function' && define.amd ) {
+  // AMD
+  define( function() {
+    return getStyleProperty;
+  });
+} else if ( typeof exports === 'object' ) {
+  // CommonJS
+  module.exports = getStyleProperty;
+} else {
+  // browser global
+  window.getStyleProperty = getStyleProperty;
+}
+
+})( window );
+
+/*!
+ * getSize v1.1.9
+ * Measure the height & width of elements
+ * MIT license
+ */
+
+/*jshint browser: true, strict: false, undef: true, unused: true */
+/*global define: false, module: false */
+
+( function( window, undefined ) {
+
+// -------------------------- helpers -------------------------- //
+
+var getStyle = window.getComputedStyle;
+var getStyleProperty = window.getStyleProperty;
+var isNaN = Number.isNaN || function( value ) {
+  return typeof value === 'number' && value !== value;
+};
+
+/**
+ * get a number from a string, not a percentage
+ * @param {String} elemStyle
+ * @returns {Number}
+ */
+function getStyleSize( elemStyle ) {
+  var num = parseFloat( elemStyle );
+  // not a percent like '100%', and a number
+  var isValid = elemStyle.indexOf('%') === -1 && !isNaN( num );
+  return isValid && num;
+}
+
+// -------------------------- setup -------------------------- //
+
+var boxSizingProp = getStyleProperty('boxSizing');
+var isBoxSizeOuter;
+
+/**
+ * detects if box-sizing: border-box is used
+ * Chrome measures border-box differently from other browsers
+ * http://meta.wikimedia.org/wiki/Box-sizing#Quirks_in_Chrome
+ */
+( function() {
+  if ( !boxSizingProp ) {
+    return;
+  }
+
+  var div = document.createElement('div');
+  div.style.width = '200px';
+  div.style.padding = '1px 2px 3px 4px';
+  div.style.borderStyle = 'solid';
+  div.style.borderWidth = '1px 2px 3px 4px';
+  div.style[boxSizingProp] = 'border-box';
+
+  var body = document.body || document.documentElement;
+  body.appendChild( div );
+  var style = getStyle( div, null );
+
+  // in Chrome 41, actualSize === 160
+  isBoxSizeOuter = getStyleSize( style.width ) === 200;
+  body.removeChild( div );
+})();
+
+// -------------------------- getSize -------------------------- //
+
+function getSize( elem ) {
+  if ( typeof elem === 'string' ) {
+    elem = document.querySelector( elem );
+  }
+
+  // do not proceed on non-objects
+  if ( !elem || typeof elem !== 'object' || !elem.nodeType ) {
+    return;
+  }
+
+  var style = getStyle( elem, null );
+
+  if ( style.display === 'none' ) {
+    return getZeroSize();
+  }
+
+  var size = {};
+  size.width = elem.offsetWidth;
+  size.height = elem.offsetHeight;
+
+  var isBorderBox = style[boxSizingProp] === 'border-box';
+  if ( isBorderBox || isBoxSizeOuter ) {
+    size.width += getStyleSize( style.borderLeftWidth ) +
+      getStyleSize( style.borderRightWidth ) +
+      getStyleSize( style.paddingLeft ) +
+      getStyleSize( style.paddingRight );
+
+    size.height += getStyleSize( style.borderTopWidth ) +
+      getStyleSize( style.borderBottomWidth ) +
+      getStyleSize( style.paddingTop ) +
+      getStyleSize( style.paddingBottom );
+  }
+
+  return size;
+}
+
+function getZeroSize() {
+  return {
+    width: 0,
+    height: 0,
+    isBorderBox: false
+  };
+}
+
+// -------------------------- transport -------------------------- //
+
+if ( typeof define === 'function' && define.amd ) {
+  // AMD
+  define( function() {
+    return getSize;
+  });
+} else if ( typeof exports === 'object' ) {
+  // CommonJS
+  module.exports = getSize;
+} else {
+  // browser global
+  window.getSize = getSize;
+}
+
+})( window );
+
+/*!
+ * imagesLoaded v3.1.8
+ * JavaScript is all like "You images are done yet or what?"
+ * MIT License
+ */
+
+( function( window, factory ) { 
+  // universal module definition
+
+  /*jshint strict: true */
+
+  if ( typeof define === 'function' && define.amd ) {
+    // AMD
+    define([
+      'eventEmitter',
+      'eventie',
+      'getSize'
+    ], function( EventEmitter, eventie, getSize ) {
+      return factory( window, EventEmitter, eventie, getSize );
+    });
+  } else if ( typeof exports === 'object' ) {
+    // CommonJS
+    module.exports = factory(
+      window,
+      require('wolfy87-eventemitter'),
+      require('eventie'),
+      require('get-size')
+    );
+  } else {
+    // browser global
+    window.imagesLoaded = factory(
+      window,
+      window.EventEmitter,
+      window.eventie,
+      window.getSize
+    );
+  }
+
+})( window,
+
+// --------------------------  factory -------------------------- //
+
+function factory( window, EventEmitter, eventie, getSize ) {
+
+var $ = window.jQuery;
+var console = window.console;
+
+// -------------------------- helpers -------------------------- //
+
+// extend objects
+function extend( a, b ) {
+  for ( var prop in b ) {
+    a[ prop ] = b[ prop ];
+  }
+  return a;
+}
+
+var objToString = Object.prototype.toString;
+function isArray( obj ) {
+  return objToString.call( obj ) === '[object Array]';
+}
+
+// -------------------------- imagesLoaded -------------------------- //
+
+/**
+ * @param {Array, Element, String} elem
+ * @param {Object or Function} options
+ * @param {Function} onAlways - callback function
+ */
+function ImagesLoaded( elem, options, onAlways ) {
+  // coerce ImagesLoaded() without new, to be new ImagesLoaded()
+  if ( !( this instanceof ImagesLoaded ) ) {
+    return new ImagesLoaded( elem, options, onAlways );
+  }
+  // use elem as selector string
+  if ( typeof elem === 'string' ) {
+    elem = document.querySelectorAll( elem );
+  }
+
+  this.elements = makeArray( elem );
+  this.options = extend( {}, this.options );
+
+  if ( typeof options === 'function' ) {
+    onAlways = options;
+  } else {
+    extend( this.options, options );
+  }
+
+  if ( onAlways ) {
+    this.on( 'always', onAlways );
+  }
+
+  this.getImages();
+
+  if ( $ ) {
+    // add jQuery Deferred object
+    this.jqDeferred = new $.Deferred();
+  }
+
+  // HACK check async to avoid double logic
+  setTimeout( function() {
+    this.check();
+  }.bind( this ));
+}
+
+ImagesLoaded.prototype = new EventEmitter();
+
+ImagesLoaded.prototype.options = {};
+
+ImagesLoaded.prototype.getImages = function() {
+  this.images = [];
+
+  // filter & find items if we have selector
+  for ( var i=0, len = this.elements.length; i < len; i++ ) {
+    var elem = this.elements[i];
+    // filter siblings
+    if ( elem.nodeName === 'IMG' ) {
+      this.addImage( elem );
+    }
+    // get background image on element
+    var background = this.options.background === true;
+    this.addElementImages( elem, background );
+
+    var selector = elem.nodeType === 1 && this.options.isBackground;
+    if ( selector ) {
+      this.addElementImages( elem, selector );
+    }
+  }
+};
+
+var elementNodeTypes = [1, 9, 11];
+
+ImagesLoaded.prototype.addElementImages = function( elem, selector ) {
+  if ( typeof selector === 'string' ) {
+    selector = document.querySelectorAll( selector );
+  }
+  // add selector findings
+  if ( !selector || !('length' in selector) ) {
+    return;
+  }
+
+  if ( isArray( selector ) ) {
+    // convert if array-like of nodes
+    selector = makeArray( selector );
+  }
+
+  for ( var i=0, len = selector.length; i < len; i++ ) {
+    var subElem = selector[i];
+    if ( elementNodeTypes.indexOf( subElem.nodeType ) !== -1 ) {
+      this.addImage( subElem );
+    }
+  }
+};
+
+/**
+ * @param {Image or Element} img
+ */
+ImagesLoaded.prototype.addImage = function( img ) {
+  var loadingImage = new LoadingImage( img );
+  this.images.push( loadingImage );
+};
+
+ImagesLoaded.prototype.check = function() {
+  var _this = this;
+  this.progressedCount = 0;
+  this.hasAnyBroken = false;
+  // complete if no images
+  if ( !this.images.length ) {
+    this.complete();
+    return;
+  }
+
+  function onProgress( image, elem, message ) {
+    // HACK - Chrome triggers event before object properties have changed. #83
+    setTimeout( function() {
+      _this.progress( image, elem, message );
+    });
+  }
+
+  for ( var i=0, len = this.images.length; i < len; i++ ) {
+    var loadingImage = this.images[i];
+    loadingImage.once( 'progress', onProgress );
+    loadingImage.check();
+  }
+};
+
+ImagesLoaded.prototype.progress = function( image, elem, message ) {
+  this.progressedCount++;
+  this.hasAnyBroken = this.hasAnyBroken || !image.isLoaded;
+  // progress event
+  this.emit( 'progress', this, image, elem );
+  if ( this.jqDeferred && this.jqDeferred.notify ) {
+    this.jqDeferred.notify( this, image );
+  }
+  // check if completed
+  if ( this.progressedCount === this.images.length ) {
+    this.complete();
+  }
+};
+
+ImagesLoaded.prototype.complete = function() {
+  this.off( 'progress' );
+
+  this.isComplete = true;
+  this.emit( 'complete', this, this.hasAnyBroken );
+  if ( this.jqDeferred ) {
+    if ( this.hasAnyBroken ) {
+      this.jqDeferred.reject( this );
+    } else {
+      this.jqDeferred.resolve( this );
+    }
+  }
+};
+
+// -------------------------- LoadingImage -------------------------- //
+
+function LoadingImage( img ) {
+  this.img = img;
+}
+
+LoadingImage.prototype = new EventEmitter();
+
+LoadingImage.prototype.check = function() {
+  // If complete, nothing to do
+  // If complete but size is zero, still need to check
+  if ( this.getIsComplete() ) {
+    this.confirm( this.img.naturalWidth !== 0, 'naturalWidth' );
+    return;
+  }
+
+  // attach listeners to confirm.loaded
+  this.proxyOn( this.img, 'load', this.confirm );
+  this.proxyOn( this.img, 'error', this.confirm );
+  this.proxyOn( this.img, 'readystatechange', this.confirm );
+
+  this.img.src = this.img.src;
+};
+
+LoadingImage.prototype.getIsComplete = function() {
+  return this.img.complete && this.img.naturalWidth !== undefined;
+};
+
+LoadingImage.prototype.confirm = function( isLoaded, message ) {
+  this.isLoaded = isLoaded !== false;
+  this.emit( 'progress', this, this.img, message );
+};
+
+// ----- checks & emits ----- //
+
+LoadingImage.prototype.proxyOn = function( obj, event, fn ) {
+  // old IE does not have addEventListener / removeEventListener
+  // so use eventie binding
+  eventie.bind( obj, event, fn.bind( this ) );
+};
+
+// -------------------------- Utility -------------------------- //
+
+function makeArray( obj ) {
+  var ary = [];
+  if ( isArray( obj ) ) {
+    // use object if already an array
+    ary = obj;
+  } else if ( typeof obj.length === 'number' ) {
+    // convert array-like objects
+    for ( var i=0, len = obj.length; i < len; i++ ) {
+      ary.push( obj[i] );
+    }
+  } else {
+    // add single item
+    ary.push( obj );
+  }
+  return ary;
+}
+
+// -------------------------- jQuery -------------------------- //
+
+if ( $ ) {
+  $.fn.imagesLoaded = function( options, callback ) {
+    var instance = new ImagesLoaded( this, options, callback );
+    return instance.jqDeferred.promise( $(this) );
+  };
+}
+
+// --------------------------  Outlets -------------------------- //
+
+return ImagesLoaded;
+
+});
+
+	/**
 	 * Edits listeners in bulk. The addListeners and removeListeners methods both use this to do their job. You should really use those instead, this is a little lower level.
 	 * The first argument will determine if the listeners are removed (true) or added (false).
 	 * If you pass an object as the second argument you can add/remove from multiple events at once. The object should contain key value pairs of events and listeners or listener arrays.
@@ -608,7 +1333,9 @@ var hasConsole = typeof console !== 'undefined';
 // extend objects
 function extend( a, b ) {
   for ( var prop in b ) {
-    a[ prop ] = b[ prop ];
+    if (b.hasOwnProperty(prop)) {
+      a[ prop ] = b[ prop ];
+    }
   }
   return a;
 }
@@ -680,7 +1407,8 @@ function makeArray( obj ) {
     });
   }
 
-  ImagesLoaded.prototype = new EventEmitter();
+  ImagesLoaded.prototype = Object.create( EventEmitter.prototype );
+  ImagesLoaded.prototype.constructor = ImagesLoaded;
 
   ImagesLoaded.prototype.options = {};
 
@@ -728,9 +1456,9 @@ function makeArray( obj ) {
       return;
     }
 
-    function onConfirm( image, message ) {
+    function onConfirm( image ) {
       if ( _this.options.debug && hasConsole ) {
-        console.log( 'confirm', image, message );
+        console.log( 'confirm', image, image.message );
       }
 
       _this.progress( image );
@@ -738,7 +1466,6 @@ function makeArray( obj ) {
       if ( checkedCount === length ) {
         _this.complete();
       }
-      return true; // bind once
     }
 
     for ( var i=0; i < length; i++ ) {
@@ -789,15 +1516,21 @@ function makeArray( obj ) {
 
   function LoadingImage( img ) {
     this.img = img;
+    this.isLoaded = false; // Initialize isLoaded
+    this.message = '';
+    this.resource = cache[ this.img.src ] || new Resource( this.img.src );
+    this.resource.on( 'confirm', this.confirm.bind(this) );
   }
 
-  LoadingImage.prototype = new EventEmitter();
+  LoadingImage.prototype = Object.create( EventEmitter.prototype );
+  LoadingImage.prototype.constructor = LoadingImage;
+
 
   LoadingImage.prototype.check = function() {
     // first check cached any previous images that have same src
-    var resource = cache[ this.img.src ] || new Resource( this.img.src );
-    if ( resource.isConfirmed ) {
-      this.confirm( resource.isLoaded, 'cached was confirmed' );
+
+    if ( this.resource.isConfirmed ) {
+      this.confirm(this.resource);
       return;
     }
 
@@ -805,23 +1538,19 @@ function makeArray( obj ) {
     // try to check for image status manually.
     if ( this.img.complete && this.img.naturalWidth !== undefined ) {
       // report based on naturalWidth
-      this.confirm( this.img.naturalWidth !== 0, 'naturalWidth' );
+      var isLoaded = this.img.naturalWidth !== 0;
+      this.resource.confirm(isLoaded, 'naturalWidth');
       return;
     }
 
-    // If none of the checks above matched, simulate loading on detached element.
-    var _this = this;
-    resource.on( 'confirm', function( resrc, message ) {
-      _this.confirm( resrc.isLoaded, message );
-      return true;
-    });
 
-    resource.check();
+    this.resource.check();
   };
 
-  LoadingImage.prototype.confirm = function( isLoaded, message ) {
-    this.isLoaded = isLoaded;
-    this.emit( 'confirm', this, message );
+  LoadingImage.prototype.confirm = function( resource ) {
+    this.isLoaded = resource.isLoaded;
+    this.message = resource.message;
+    this.emit( 'confirm', this );
   };
 
   // -------------------------- Resource -------------------------- //
@@ -833,11 +1562,15 @@ function makeArray( obj ) {
 
   function Resource( src ) {
     this.src = src;
+    this.isConfirmed = false;
+    this.isLoaded = false;
+    this.message = '';
     // add to cache
     cache[ src ] = this;
   }
 
-  Resource.prototype = new EventEmitter();
+  Resource.prototype = Object.create( EventEmitter.prototype );
+  Resource.prototype.constructor = Resource;
 
   Resource.prototype.check = function() {
     // only trigger checking once
@@ -846,8 +1579,8 @@ function makeArray( obj ) {
     }
     // simulate loading on detached element
     var proxyImage = new Image();
-    eventie.bind( proxyImage, 'load', this );
-    eventie.bind( proxyImage, 'error', this );
+    proxyImage.addEventListener( 'load', this );
+    proxyImage.addEventListener( 'error', this );
     proxyImage.src = this.src;
     // set flag
     this.isChecked = true;
@@ -878,12 +1611,13 @@ function makeArray( obj ) {
   Resource.prototype.confirm = function( isLoaded, message ) {
     this.isConfirmed = true;
     this.isLoaded = isLoaded;
-    this.emit( 'confirm', this, message );
+    this.message = message;
+    this.emit( 'confirm', this );
   };
 
   Resource.prototype.unbindProxyEvents = function( event ) {
-    eventie.unbind( event.target, 'load', this );
-    eventie.unbind( event.target, 'error', this );
+    event.target.removeEventListener( 'load', this );
+    event.target.removeEventListener( 'error', this );
   };
 
   // -----  ----- //
