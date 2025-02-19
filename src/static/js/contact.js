@@ -1,36 +1,49 @@
-jQuery(document).ready(function(){
+document.addEventListener('DOMContentLoaded', function() {
+  const contactForm = document.getElementById('contactform');
 
-	$('#contactform').submit(function(){
+  contactForm.addEventListener('submit', function(event) {
+    event.preventDefault();
 
-		var action = $(this).attr('action');
+    const action = this.getAttribute('action');
+    const messageDiv = document.getElementById('message');
+    const submitButton = document.getElementById('submit');
 
-		$("#message").slideUp(750,function() {
-		$('#message').hide();
+    function displayMessage(data) {
+      messageDiv.innerHTML = data;
+      messageDiv.style.display = 'block'; // Ensure it's visible
+      messageDiv.classList.add('show'); // Use a class for smoother animation
 
- 		$('#submit')
-			.after('<img src="images/loading.gif" class="loader" />')
-			.attr('disabled','disabled');
+      const loader = document.querySelector('#contactform img.loader');
+      if (loader) {
+        loader.remove(); //Remove loader
+      }
+      submitButton.removeAttribute('disabled');
 
-		$.post(action, {
-			name: $('#name').val(),
-			email: $('#email').val(),
-			comments: $('#comments').val(),
-			verify: $('#verify').val()
-		},
-			function(data){
-				document.getElementById('message').innerHTML = data;
-				$('#message').slideDown('slow');
-				$('#contactform img.loader').fadeOut('slow',function(){$(this).remove()});
-				$('#submit').removeAttr('disabled');
-				if(data.match('success') != null) $('#contactform').slideUp('slow');
+      if (data.includes('success')) {
+        contactForm.style.display = 'none';
+        contactForm.classList.add('hidden'); //Use a class for smoother animation
+      }
+    }
 
-			}
-		);
+    messageDiv.classList.remove('show'); // Reset animation
+    messageDiv.style.display = 'none';
 
-		});
+    submitButton.insertAdjacentHTML('afterend', '<img src="images/loading.gif" class="loader" />');
+    submitButton.setAttribute('disabled', 'disabled');
 
-		return false;
+    const formData = new FormData(contactForm);
 
-	});
-
+    fetch(action, {
+      method: 'POST',
+      body: formData,
+    })
+    .then(response => response.text())
+    .then(data => {
+        displayMessage(data);
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      displayMessage('An error occurred. Please try again.');
+    });
+  });
 });

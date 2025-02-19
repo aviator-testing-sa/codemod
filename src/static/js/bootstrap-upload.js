@@ -60,4 +60,4 @@
         var r = e(t.target).closest('[data-dismiss="fileupload"],[data-trigger="fileupload"]');
         r.length > 0 && (r.trigger("click.fileupload"), t.preventDefault())
     })
-}(window.jQuery)
+}(jQuery)

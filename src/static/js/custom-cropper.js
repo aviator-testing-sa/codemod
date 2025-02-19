@@ -3,6 +3,8 @@
  *
  */
 
+// Assuming modal and cropper are still valid and compatible.
+// If not, they need to be updated/replaced as well.
 var modal = require('./modal');
 var cropper = require('./cropper');
 
@@ -82,8 +84,10 @@ var crop = function(img) {
     });
 }
 
+var $cropperImg; // Declare $cropperImg in a wider scope
+
 var _cropperLoaded = function(img) {
-    $cropperImg = $('#cropper-image');
+    $cropperImg = $('#cropper-image'); // Assign it here
     if(img) {
         $cropperImg
             .attr('src',img)
