@@ -9,28 +9,28 @@
     width: 220px\9
 }
 
-.bootstrap-select>.dropdown-toggle {
+.bootstrap-select > .dropdown-toggle {
     width: 100%;
     padding-right: 25px;
     z-index: 1
 }
 
-.bootstrap-select>select {
-    position: absolute!important;
+.bootstrap-select > select {
+    position: absolute !important;
     bottom: 0;
     left: 50%;
-    width: .11px!important;
-    height: 100%!important;
-    padding: 0!important;
-    opacity: 0!important;
+    width: .11px !important;
+    height: 100% !important;
+    padding: 0 !important;
+    opacity: 0 !important;
     border: none
 }
 
-.bootstrap-select>select.mobile-device {
+.bootstrap-select > select.mobile-device {
     top: 0;
     left: 0;
-    display: block!important;
-    width: 100%!important;
+    display: block !important;
+    width: 100% !important;
     z-index: 2
 }
 
@@ -40,7 +40,7 @@
 }
 
 .bootstrap-select.fit-width {
-    width: auto!important
+    width: auto !important
 }
 
 .bootstrap-select:not([class*=col-]):not([class*=form-control]):not(.input-group-btn) {
@@ -91,13 +91,13 @@
 }
 
 .bootstrap-select.btn-group.disabled,
-.bootstrap-select.btn-group>.disabled {
+.bootstrap-select.btn-group > .disabled {
     cursor: not-allowed
 }
 
 .bootstrap-select.btn-group.disabled:focus,
-.bootstrap-select.btn-group>.disabled:focus {
-    outline: 0!important
+.bootstrap-select.btn-group > .disabled:focus {
+    outline: 0 !important
 }
 
 .bootstrap-select.btn-group.bs-container {
@@ -228,7 +228,7 @@
     margin-right: 34px
 }
 
-.bootstrap-select.show-menu-arrow.open>.dropdown-toggle {
+.bootstrap-select.show-menu-arrow.open > .dropdown-toggle {
     z-index: 1061
 }
 
@@ -278,8 +278,8 @@
     left: auto
 }
 
-.bootstrap-select.show-menu-arrow.open>.dropdown-toggle:after,
-.bootstrap-select.show-menu-arrow.open>.dropdown-toggle:before {
+.bootstrap-select.show-menu-arrow.open > .dropdown-toggle:after,
+.bootstrap-select.show-menu-arrow.open > .dropdown-toggle:before {
     display: block
 }
 
@@ -312,10 +312,9 @@
     width: 100%
 }
 
-.bs-searchbox+.bs-actionsbox {
+.bs-searchbox + .bs-actionsbox {
     padding: 0 8px 4px
 }
-
 .bs-searchbox .form-control {
     margin-bottom: 0;
     width: 100%;
