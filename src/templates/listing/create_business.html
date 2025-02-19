@@ -67,7 +67,7 @@
                 </div>
                 {% endif %}
                 <div class="space">
-                    {{ form.hidden_tag() }}
+                    {{ form.csrf_token }}
                     <button type="submit" class="btn btn-primary col-xs-5">SAVE</button>
                     <div class="clearfix"></div>
                 </div>
