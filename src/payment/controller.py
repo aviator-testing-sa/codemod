@@ -17,6 +17,9 @@ def add_card(user, token):
         user.stripe_customer_key = stripe_customer.id
         db.session.commit()
     else:
-        stripe_customer = stripe.Customer.retrieve(user.stripe_customer_key)
-        stripe_customer.card = token
-        stripe_customer.save()
+        customer = stripe.Customer.retrieve(user.stripe_customer_key)
+        # The update method replaces `stripe_customer.card = token` and `stripe_customer.save()`
+        stripe.Customer.modify(
+            user.stripe_customer_key,
+            source=token
+        )
