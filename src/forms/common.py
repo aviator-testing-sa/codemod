@@ -3,7 +3,7 @@
 #
 #
 import decimal
-import urllib
+import urllib.parse
 import wtforms
 
 
@@ -11,14 +11,14 @@ def validate_unquoted(form, field):
     """
     True if quoted field is same as unquoted
     """
-    return urllib.quote(field.data) == field.data
+    return urllib.parse.quote(field.data) == field.data
 
 
 def filter_lowercase(string):
     """
     Ensure string is lowercase
     """
-    if not isinstance(string, basestring):
+    if not isinstance(string, str):
         return string
     return string.lower()
 
@@ -34,18 +34,22 @@ def get_select_choices(values, placeholder=None):
 
 
 class SlugField(wtforms.StringField):
-    def __init__(self, label=None, validators=(), filters=(), *args, **kwargs):
+    def __init__(self, label=None, validators=None, filters=None, *args, **kwargs):
+        validators = validators or ()
+        filters = filters or ()
         validators = tuple(validators) + (validate_unquoted,)
         filters = tuple(filters) + (filter_lowercase,)
-        super(SlugField, self).__init__(label, validators, filters, *args, **kwargs)
+        super().__init__(label, validators, filters, *args, **kwargs)
 
 
-class CentsField(wtforms.TextField):
+class CentsField(wtforms.StringField):  # Changed from TextField to StringField
     def process_formdata(self, valuelist):
         if not valuelist:
             return
         self.data = decimal.Decimal(valuelist[0]) * 100
 
     def process_data(self, value):
-        self.data = decimal.Decimal(value)
-
+        if value is not None:  # Add a check for None
+            self.data = decimal.Decimal(value)
+        else:
+            self.data = None
