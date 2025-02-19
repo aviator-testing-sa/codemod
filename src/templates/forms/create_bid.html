@@ -16,7 +16,7 @@
     </div>
     <div>
       <div class="errors" id="errors">{{ error }}</div>
-      {{ form.hidden_tag() }}
+      {{ form.csrf_token }}
     </div>
   </fieldset>
 </form>
