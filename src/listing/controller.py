@@ -1,6 +1,8 @@
 import datetime
 import errors
 import sqlalchemy
+from sqlalchemy import select, desc, or_
+from sqlalchemy.orm import selectinload
 
 from schema.activity import Activity
 from schema.auction import Auction
@@ -12,21 +14,30 @@ import utils
 
 
 def get_listing(listing_id):
-    listing = Listing.query.get_or_404(int(listing_id))
+    listing = db.session.get(Listing, int(listing_id))
+    if listing is None:
+        raise errors.NotFoundError("Listing not found")
     if listing.active:
         return listing
     raise errors.InvalidValueError("Cannot access listing")
 
 def get_auction(auction_id):
-    auction = Auction.query.get_or_404(int(auction_id))
+    auction = db.session.get(Auction, int(auction_id))
+    if auction is None:
+        raise errors.NotFoundError("Auction not found")
     if auction.active:
         return auction
     raise errors.InvalidValueError("Cannot access auction")
 
 def get_latest_auction(listing_id):
-    auctions = Auction.query.filter_by(listingid=int(listing_id)).filter_by(active=True) \
-        .order_by(Auction.id.desc()).all()
-    return auctions[0] if auctions else None
+    stmt = (
+        select(Auction)
+        .filter_by(listingid=int(listing_id), active=True)
+        .order_by(desc(Auction.id))
+        .limit(1)
+    )
+    auction = db.session.execute(stmt).scalar_one_or_none()
+    return auction
 
 
 def create_product(user, form):
@@ -78,7 +89,7 @@ def edit_listing(user, listing, form, status):
     listing.revenue_cents = int(form.revenue.data * 100)
     listing.investment_cents = int(form.investment.data * 100)
     if status == 'published':
-        _start_auction(user, listing, form.expiration.data)
+        _start_auction(listing, form.expiration.data)
     db.session.commit()
 
 def upload_file(user, listing, file):
@@ -147,8 +158,12 @@ def delete_listing(user, listing):
 def ensure_auction_active():
     # Update all expired auctions
     today = datetime.datetime.utcnow().date
-    auctions = Auction.query.filter_by(active=True).filter_by(status='started') \
-        .filter(Auction.expiration < today).all()
+    stmt = (
+        select(Auction)
+        .filter_by(active=True, status='started')
+        .filter(Auction.expiration < today)
+    )
+    auctions = db.session.execute(stmt).scalars()
     for auction in auctions:
         auction.status = 'expired'
     db.session.commit()
@@ -181,7 +196,8 @@ def ensure_listing_slug(name, current_slug=''):
     base_slug = utils.slugify(name)
     if current_slug == base_slug:
         return base_slug
-    listings = Listing.query.filter(Listing.slug.ilike(base_slug + '%')).all()
+    stmt = select(Listing).filter(Listing.slug.ilike(base_slug + '%'))
+    listings = db.session.execute(stmt).scalars().all()
     if listings:
         var = 1
         slugs = [listing.slug for listing in listings]
@@ -201,7 +217,7 @@ def build_search_listing(string, asmatch=False, order="-updated", limit=50, offs
     """
     cls = schema.listing.Listing
 
-    def filter(qry, k, v):
+    def filter_query(qry, k, v):
         attr = getattr(cls, k)
 
         if not isinstance(v, (tuple, list)):
@@ -214,27 +230,31 @@ def build_search_listing(string, asmatch=False, order="-updated", limit=50, offs
         return qry.filter(attr.in_(v))
 
     # build query
-    qry = db.session.query(cls)
-    for k,v in filters.iteritems():
-        qry = filter(qry, k, v)
+    qry = select(cls)
+    for k,v in filters.items():
+        qry = filter_query(qry, k, v)
 
     # build search string
     if string is not None:
         f1 = cls.filter_like_name(string, asmatch=asmatch)
         f2 = cls.filter_like_category(string, asmatch=asmatch)
         f3 = cls.filter_like_domain(string, asmatch=asmatch)
-        qry = qry.filter(f1 | f2 | f3)
+        qry = qry.filter(or_(f1, f2, f3))
 
     # build ordering
+    order_by_clauses = []
     if order is not None:
-        if isinstance(order, basestring):
-            order = order,
+        if isinstance(order, str):
+            order = (order,)
         for o in order:
-            attr = getattr(cls, o)
+            attr = getattr(cls, o.lstrip("-"))  # Remove "-" before getattr
             if o.startswith("-"):
-                qry = qry.order_by(attr.desc())
+                order_by_clauses.append(desc(attr))
             else:
-                qry = qry.order_by(attr)
+                order_by_clauses.append(attr)
+    if order_by_clauses:
+        qry = qry.order_by(*order_by_clauses)
+
 
     # limit & offset
     if limit is not None:
