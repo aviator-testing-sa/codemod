@@ -16,13 +16,15 @@ from main import db
 from user.current_user import CurrentUser
 import utils
 
+from flask_login import login_user as flask_login_user
+from flask_login import logout_user as flask_logout_user
 
 
 def login_user(user, remember=False):
-    flask.ext.login.login_user(CurrentUser(user), remember=remember)
+    flask_login_user(CurrentUser(user), remember=remember)
 
 def logout_user():
-    flask.ext.login.logout_user()
+    flask_logout_user()
 
 def get_user_by_name(name):
     """
@@ -173,7 +175,7 @@ def send_reset_email_by_user(user):
 
 def validate_email(email):
     # Check if the user is already registered.
-    user = schema.User.query.filter_by(email_id=email).first()
+    user = db.session.execute(db.select(schema.User).filter_by(email_id=email)).scalar_one_or_none()
     if user:
         raise UserWarning("Email Already exists")
     if not _is_valid_email(email):

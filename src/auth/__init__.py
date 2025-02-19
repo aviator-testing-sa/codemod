@@ -1,5 +1,5 @@
 import utils
-from flask.ext.login import current_user
+from flask_login import current_user
 from functools import wraps
 
 
@@ -21,7 +21,6 @@ def seller_required(func):
             (current_user.user.is_seller() or current_user.user.is_admin()):
             return func(*args, **kwargs)
         else:
-            print "ABORTING@@"
+            print("ABORTING@@")
             return utils.abort(400, detail="Not an authorized seller")
     return wrapped
-
