@@ -1,7 +1,5 @@
-from flask import jsonify
-from flask import request
-from flask.ext.login import current_user
-from flask.ext.login import login_required
+from flask import jsonify, request
+from flask_login import current_user, login_required
 from main import app
 from payment import controller
 
