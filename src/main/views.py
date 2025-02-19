@@ -5,8 +5,8 @@ from flask import redirect
 from flask import render_template
 from flask import send_from_directory
 from flask import url_for
-from flask.ext.login import current_user
-from flask.ext.login import login_required
+from flask_login import current_user
+from flask_login import login_required
 from main import app
 
 @app.route('/')
@@ -17,7 +17,6 @@ def index():
 @app.route('/contact')
 def contact():
 	return redirect('https://docs.google.com/forms/d/e/1FAIpQLSfZTjld-BQgEVdaEn3dNSZAZ2Hq4bTxlgkojsbBeoij8BGD0Q/viewform')
-
 
 @app.route('/email')
 def email():
