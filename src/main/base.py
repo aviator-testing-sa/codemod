@@ -6,8 +6,7 @@ from main import app
 def inject_params():
     params = {}
     params['now'] = datetime.datetime.utcnow()
-    for key in app.config:
-        params[key] = app.config[key]
+    params.update(app.config)  # Use update() for simpler config injection
 
     params['image_path'] = image_path
     params['post_date_format'] = post_date_format
