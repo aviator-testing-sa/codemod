@@ -198,7 +198,7 @@
       $.data( elem, 'isoTransform', data );
 
       // set name to vendor specific property
-      elem.style[ transformProp ] = valueFns;
+      elem.style.setProperty( transformProp, valueFns );
     };
 
     // ==================== scale ===================
@@ -287,10 +287,10 @@
 
   $event.special.smartresize = {
     setup: function() {
-      $(this).bind( "resize", $event.special.smartresize.handler );
+      $(this).on( "resize", $event.special.smartresize.handler );
     },
     teardown: function() {
-      $(this).unbind( "resize", $event.special.smartresize.handler );
+      $(this).off( "resize", $event.special.smartresize.handler );
     },
     handler: function( event, execAsap ) {
       // Save the context
@@ -308,7 +308,7 @@
   };
 
   $.fn.smartresize = function( fn ) {
-    return fn ? this.bind( "smartresize", fn ) : this.trigger( "smartresize", ["execAsap"] );
+    return fn ? this.on( "smartresize", fn ) : this.trigger( "smartresize", ["execAsap"] );
   };
 
 
@@ -700,7 +700,7 @@
           }
           // get transition duration of the first element in that object
           // yeah, this is inexact
-          var duration = parseFloat( getComputedStyle( testElem[0] )[ transitionDurProp ] );
+          var duration = parseFloat( window.getComputedStyle( testElem[0] )[ transitionDurProp ] );
           if ( duration > 0 ) {
             processor = function( i, obj ) {
               obj.$el[ styleFn ]( obj.style, animOpts )
@@ -1405,5 +1405,4 @@
     // so plugin methods do not have to
     return this;
   };
-
 })( window, jQuery );

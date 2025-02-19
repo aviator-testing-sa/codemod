@@ -200,7 +200,7 @@
           slider.controlNav = slider.manualControls;
           methods.controlNav.active();
           
-          slider.controlNav.live(eventType, function(event) {
+          slider.controlNav.on(eventType, function(event) {
             event.preventDefault();
             var $this = $(this),
                 target = slider.controlNav.index($this);
@@ -212,7 +212,7 @@
           });
           // Prevent iOS click event bug
           if (touch) {
-            slider.controlNav.live("click touchstart", function(event) {
+            slider.controlNav.on("click touchstart", function(event) {
               event.preventDefault();
             });
           }
@@ -251,14 +251,14 @@
         
           methods.directionNav.update();
         
-          slider.directionNav.bind(eventType, function(event) {
+          slider.directionNav.on(eventType, function(event) {
             event.preventDefault();
             var target = ($(this).hasClass(namespace + 'next')) ? slider.getTarget('next') : slider.getTarget('prev');
             slider.flexAnimate(target, vars.pauseOnAction);
           });
           // Prevent iOS click event bug
           if (touch) {
-            slider.directionNav.bind("click touchstart", function(event) {
+            slider.directionNav.on("click touchstart", function(event) {
               event.preventDefault();
             });
           }
@@ -294,7 +294,7 @@
           // slider.pausePlay.addClass(pausePlayState).text((pausePlayState == 'pause') ? vars.pauseText : vars.playText);
           methods.pausePlay.update((vars.slideshow) ? namespace + 'pause' : namespace + 'play');
         
-          slider.pausePlay.bind(eventType, function(event) {
+          slider.pausePlay.on(eventType, function(event) {
             event.preventDefault();
             if ($(this).hasClass(namespace + 'pause')) {
               slider.pause();
@@ -306,7 +306,7 @@
           });
           // Prevent iOS click event bug
           if (touch) {
-            slider.pausePlay.bind("click touchstart", function(event) {
+            slider.pausePlay.on("click touchstart", function(event) {
               event.preventDefault();
             });
           }
@@ -840,7 +840,6 @@
     removed: function(){}           //{NEW} Callback: function(slider) - Fires after a slide is removed
   }
 
-
   //FlexSlider: Plugin Function
   $.fn.flexslider = function(options) {
     options = options || {};
@@ -853,13 +852,13 @@
         if ($slides.length === 1) {
           $slides.fadeIn(400);
           if (options.start) options.start($this);
-        } else if ($this.data('flexslider') === undefined) {
+        } else if ($.data(this, 'flexslider') === undefined) {
           new $.flexslider(this, options);
         }
       });
     } else {
       // Helper strings to quickly perform functions on the slider
-      var $slider = $(this).data('flexslider');
+      var $slider = $.data(this, 'flexslider');
       switch (options) {
         case "play": $slider.play(); break;
         case "pause": $slider.pause(); break;
@@ -870,5 +869,4 @@
       }
     }
   }  
-
 })(jQuery);

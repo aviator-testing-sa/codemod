@@ -128,32 +128,44 @@
   //</editor-fold>
 
   // Case insensitive contains search
-  $.expr[':'].icontains = function (obj, index, meta) {
-    var $obj = $(obj);
-    var haystack = ($obj.data('tokens') || $obj.text()).toUpperCase();
-    return haystack.includes(meta[3].toUpperCase());
-  };
+  $.expr[':'].icontains = $.expr.createPseudo(function(arg) {
+    arg = arg.toUpperCase();
+    return function( elem ) {
+      var $elem = $(elem);
+      var haystack = ($elem.data('tokens') || $elem.text()).toUpperCase();
+      return haystack.includes(arg);
+    };
+  });
 
   // Case insensitive begins search
-  $.expr[':'].ibegins = function (obj, index, meta) {
-    var $obj = $(obj);
-    var haystack = ($obj.data('tokens') || $obj.text()).toUpperCase();
-    return haystack.startsWith(meta[3].toUpperCase());
-  };
+  $.expr[':'].ibegins = $.expr.createPseudo(function(arg) {
+    arg = arg.toUpperCase();
+    return function( elem ) {
+      var $elem = $(elem);
+      var haystack = ($elem.data('tokens') || $elem.text()).toUpperCase();
+      return haystack.startsWith(arg);
+    };
+  });
 
   // Case and accent insensitive contains search
-  $.expr[':'].aicontains = function (obj, index, meta) {
-    var $obj = $(obj);
-    var haystack = ($obj.data('tokens') || $obj.data('normalizedText') || $obj.text()).toUpperCase();
-    return haystack.includes(meta[3].toUpperCase());
-  };
+  $.expr[':'].aicontains = $.expr.createPseudo(function(arg) {
+    arg = arg.toUpperCase();
+    return function( elem ) {
+      var $elem = $(elem);
+      var haystack = ($elem.data('tokens') || $elem.data('normalizedText') || $elem.text()).toUpperCase();
+      return haystack.includes(arg);
+    };
+  });
 
   // Case and accent insensitive begins search
-  $.expr[':'].aibegins = function (obj, index, meta) {
-    var $obj = $(obj);
-    var haystack = ($obj.data('tokens') || $obj.data('normalizedText') || $obj.text()).toUpperCase();
-    return haystack.startsWith(meta[3].toUpperCase());
-  };
+  $.expr[':'].aibegins = $.expr.createPseudo(function(arg) {
+    arg = arg.toUpperCase();
+    return function( elem ) {
+      var $elem = $(elem);
+      var haystack = ($elem.data('tokens') || $elem.data('normalizedText') || $elem.text()).toUpperCase();
+      return haystack.startsWith(arg);
+    };
+  });
 
   /**
    * Remove all diatrics from the given text.
@@ -308,9 +320,9 @@
 
       if (typeof id !== 'undefined') {
         this.$button.attr('data-id', id);
-        $('label[for="' + id + '"]').click(function (e) {
+        $('label[for="' + id + '"]').on('click', function (e) {
           e.preventDefault();
-          that.$button.focus();
+          that.$button.trigger('focus');
         });
       }
 
@@ -325,23 +337,23 @@
       this.$newElement.data('this', this);
       if (this.options.mobile) this.mobile();
 
-      this.$newElement.on('hide.bs.dropdown', function (e) {
+      this.$newElement.on('hide.bs.dropdown', (e) => {
         that.$element.trigger('hide.bs.select', e);
       });
-      
-      this.$newElement.on('hidden.bs.dropdown', function (e) {
+
+      this.$newElement.on('hidden.bs.dropdown', (e) => {
         that.$element.trigger('hidden.bs.select', e);
       });
-      
-      this.$newElement.on('show.bs.dropdown', function (e) {
+
+      this.$newElement.on('show.bs.dropdown', (e) => {
         that.$element.trigger('show.bs.select', e);
       });
-      
-      this.$newElement.on('shown.bs.dropdown', function (e) {
+
+      this.$newElement.on('shown.bs.dropdown', (e) => {
         that.$element.trigger('shown.bs.select', e);
       });
 
-      setTimeout(function () {
+      setTimeout(() => {
         that.$element.trigger('loaded.bs.select');
       });
     },
@@ -350,59 +362,59 @@
       // Options
       // If we are multiple, then add the show-tick class by default
       var multiple = this.multiple ? ' show-tick' : '',
-          inputGroup = this.$element.parent().hasClass('input-group') ? ' input-group-btn' : '',
-          autofocus = this.autofocus ? ' autofocus' : '';
+        inputGroup = this.$element.parent().hasClass('input-group') ? ' input-group-btn' : '',
+        autofocus = this.autofocus ? ' autofocus' : '';
       // Elements
       var header = this.options.header ? '<div class="popover-title"><button type="button" class="close" aria-hidden="true">&times;</button>' + this.options.header + '</div>' : '';
       var searchbox = this.options.liveSearch ?
-      '<div class="bs-searchbox">' +
-      '<input type="text" class="form-control" autocomplete="off"' +
-      (null === this.options.liveSearchPlaceholder ? '' : ' placeholder="' + htmlEscape(this.options.liveSearchPlaceholder) + '"') + '>' +
-      '</div>'
-          : '';
+        '<div class="bs-searchbox">' +
+        '<input type="text" class="form-control" autocomplete="off"' +
+        (null === this.options.liveSearchPlaceholder ? '' : ' placeholder="' + htmlEscape(this.options.liveSearchPlaceholder) + '"') +
+        '</div>'
+        : '';
       var actionsbox = this.multiple && this.options.actionsBox ?
-      '<div class="bs-actionsbox">' +
-      '<div class="btn-group btn-group-sm btn-block">' +
-      '<button type="button" class="actions-btn bs-select-all btn btn-default">' +
-      this.options.selectAllText +
-      '</button>' +
-      '<button type="button" class="actions-btn bs-deselect-all btn btn-default">' +
-      this.options.deselectAllText +
-      '</button>' +
-      '</div>' +
-      '</div>'
-          : '';
+        '<div class="bs-actionsbox">' +
+        '<div class="btn-group btn-group-sm btn-block">' +
+        '<button type="button" class="actions-btn bs-select-all btn btn-default">' +
+        this.options.selectAllText +
+        '</button>' +
+        '<button type="button" class="actions-btn bs-deselect-all btn btn-default">' +
+        this.options.deselectAllText +
+        '</button>' +
+        '</div>' +
+        '</div>'
+        : '';
       var donebutton = this.multiple && this.options.doneButton ?
-      '<div class="bs-donebutton">' +
-      '<div class="btn-group btn-block">' +
-      '<button type="button" class="btn btn-sm btn-default">' +
-      this.options.doneButtonText +
-      '</button>' +
-      '</div>' +
-      '</div>'
-          : '';
+        '<div class="bs-donebutton">' +
+        '<div class="btn-group btn-block">' +
+        '<button type="button" class="btn btn-sm btn-default">' +
+        this.options.doneButtonText +
+        '</button>' +
+        '</div>' +
+        '</div>'
+        : '';
       var drop =
-          '<div class="btn-group bootstrap-select' + multiple + inputGroup + '">' +
-          '<button type="button" class="' + this.options.styleBase + ' dropdown-toggle" data-toggle="dropdown"' + autofocus + '>' +
-          '<span class="filter-option pull-left"></span>&nbsp;' +
-          '<span class="caret"></span>' +
-          '</button>' +
-          '<div class="dropdown-menu open">' +
-          header +
-          searchbox +
-          actionsbox +
-          '<ul class="dropdown-menu inner" role="menu">' +
-          '</ul>' +
-          donebutton +
-          '</div>' +
-          '</div>';
+        '<div class="btn-group bootstrap-select' + multiple + inputGroup + '">' +
+        '<button type="button" class="' + this.options.styleBase + ' dropdown-toggle" data-toggle="dropdown"' + autofocus + '>' +
+        '<span class="filter-option pull-left"></span>&nbsp;' +
+        '<span class="caret"></span>' +
+        '</button>' +
+        '<div class="dropdown-menu open">' +
+        header +
+        searchbox +
+        actionsbox +
+        '<ul class="dropdown-menu inner" role="menu">' +
+        '</ul>' +
+        donebutton +
+        '</div>' +
+        '</div>';
 
       return $(drop);
     },
 
     createView: function () {
       var $drop = this.createDropdown(),
-          li = this.createLi();
+        li = this.createLi();
 
       $drop.find('ul')[0].innerHTML = li;
       return $drop;
@@ -422,10 +434,10 @@
 
     createLi: function () {
       var that = this,
-          _li = [],
-          optID = 0,
-          titleOption = document.createElement('option'),
-          liIndex = -1; // increment liIndex whenever a new <li> element is created to ensure liObj is correct
+        _li = [],
+        optID = 0,
+        titleOption = document.createElement('option'),
+        liIndex = -1; // increment liIndex whenever a new <li> element is created to ensure liObj is correct
 
       // Helper functions
       /**
@@ -437,10 +449,10 @@
        */
       var generateLI = function (content, index, classes, optgroup) {
         return '<li' +
-            ((typeof classes !== 'undefined' & '' !== classes) ? ' class="' + classes + '"' : '') +
-            ((typeof index !== 'undefined' & null !== index) ? ' data-original-index="' + index + '"' : '') +
-            ((typeof optgroup !== 'undefined' & null !== optgroup) ? 'data-optgroup="' + optgroup + '"' : '') +
-            '>' + content + '</li>';
+          ((typeof classes !== 'undefined' & '' !== classes) ? ' class="' + classes + '"' : '') +
+          ((typeof index !== 'undefined' & null !== index) ? ' data-original-index="' + index + '"' : '') +
+          ((typeof optgroup !== 'undefined' & null !== optgroup) ? 'data-optgroup="' + optgroup + '"' : '') +
+          '>' + content + '</li>';
       };
 
       /**
@@ -452,13 +464,13 @@
        */
       var generateA = function (text, classes, inline, tokens) {
         return '<a tabindex="0"' +
-            (typeof classes !== 'undefined' ? ' class="' + classes + '"' : '') +
-            (typeof inline !== 'undefined' ? ' style="' + inline + '"' : '') +
-            (that.options.liveSearchNormalize ? ' data-normalized-text="' + normalizeToBase(htmlEscape(text)) + '"' : '') +
-            (typeof tokens !== 'undefined' || tokens !== null ? ' data-tokens="' + tokens + '"' : '') +
-            '>' + text +
-            '<span class="' + that.options.iconBase + ' ' + that.options.tickIcon + ' check-mark"></span>' +
-            '</a>';
+          (typeof classes !== 'undefined' ? ' class="' + classes + '"' : '') +
+          (typeof inline !== 'undefined' ? ' style="' + inline + '"' : '') +
+          (that.options.liveSearchNormalize ? ' data-normalized-text="' + normalizeToBase(htmlEscape(text)) + '"' : '') +
+          (typeof tokens !== 'undefined' || tokens !== null ? ' data-tokens="' + tokens + '"' : '') +
+          '>' + text +
+          '<span class="' + that.options.iconBase + ' ' + that.options.tickIcon + ' check-mark"></span>' +
+          '</a>';
       };
 
       if (this.options.title && !this.multiple) {
@@ -487,12 +499,12 @@
 
         // Get the class and text for the option
         var optionClass = this.className || '',
-            inline = this.style.cssText,
-            text = $this.data('content') ? $this.data('content') : $this.html(),
-            tokens = $this.data('tokens') ? $this.data('tokens') : null,
-            subtext = typeof $this.data('subtext') !== 'undefined' ? '<small class="text-muted">' + $this.data('subtext') + '</small>' : '',
-            icon = typeof $this.data('icon') !== 'undefined' ? '<span class="' + that.options.iconBase + ' ' + $this.data('icon') + '"></span> ' : '',
-            isDisabled = this.disabled || this.parentElement.tagName === 'OPTGROUP' && this.parentElement.disabled;
+          inline = this.style.cssText,
+          text = $this.data('content') ? $this.data('content') : $this.html(),
+          tokens = $this.data('tokens') ? $this.data('tokens') : null,
+          subtext = typeof $this.data('subtext') !== 'undefined' ? '<small class="text-muted">' + $this.data('subtext') + '</small>' : '',
+          icon = typeof $this.data('icon') !== 'undefined' ? '<span class="' + that.options.iconBase + ' ' + $this.data('icon') + '"></span> ' : '',
+          isDisabled = this.disabled || this.parentElement.tagName === 'OPTGROUP' && this.parentElement.disabled;
 
         if (icon !== '' && isDisabled) {
           icon = '<span>' + icon + '</span>';
@@ -514,10 +526,10 @@
 
             // Get the opt group label
             var label = this.parentElement.label,
-                labelSubtext = typeof $this.parent().data('subtext') !== 'undefined' ? '<small class="text-muted">' + $this.parent().data('subtext') + '</small>' : '',
-                labelIcon = $this.parent().data('icon') ? '<span class="' + that.options.iconBase + ' ' + $this.parent().data('icon') + '"></span> ' : '',
-                optGroupClass = ' ' + this.parentElement.className || '';
-            
+              labelSubtext = typeof $this.parent().data('subtext') !== 'undefined' ? '<small class="text-muted">' + $this.parent().data('subtext') + '</small>' : '',
+              labelIcon = $this.parent().data('icon') ? '<span class="' + that.options.iconBase + ' ' + $this.parent().data('icon') + '"></span> ' : '',
+              optGroupClass = ' ' + this.parentElement.className || '';
+
             label = labelIcon + '<span class="text">' + label + labelSubtext + '</span>';
 
             if (index !== 0 && _li.length > 0) { // Is it NOT the first option of the select && are there elements in the dropdown?
@@ -763,7 +775,7 @@
               hasClass = function (className, include) {
                 return function (element) {
                     if (include) {
-                        return (element.classList ? element.classList.contains(className) : $(element).hasClass(className));
+                        return element.classList ? element.classList.contains(className) : $(element).hasClass(className);
                     } else {
                         return !(element.classList ? element.classList.contains(className) : $(element).hasClass(className));
                     }
@@ -1274,68 +1286,68 @@
 
     keydown: function (e) {
       var $this = $(this),
-          $parent = $this.is('input') ? $this.parent().parent() : $this.parent(),
-          $items,
-          that = $parent.data('this'),
-          index,
-          next,
-          first,
-          last,
-          prev,
-          nextPrev,
-          prevIndex,
-          isActive,
-          selector = ':not(.disabled, .hidden, .dropdown-header, .divider)',
-          keyCodeMap = {
-            32: ' ',
-            48: '0',
-            49: '1',
-            50: '2',
-            51: '3',
-            52: '4',
-            53: '5',
-            54: '6',
-            55: '7',
-            56: '8',
-            57: '9',
-            59: ';',
-            65: 'a',
-            66: 'b',
-            67: 'c',
-            68: 'd',
-            69: 'e',
-            70: 'f',
-            71: 'g',
-            72: 'h',
-            73: 'i',
-            74: 'j',
-            75: 'k',
-            76: 'l',
-            77: 'm',
-            78: 'n',
-            79: 'o',
-            80: 'p',
-            81: 'q',
-            82: 'r',
-            83: 's',
-            84: 't',
-            85: 'u',
-            86: 'v',
-            87: 'w',
-            88: 'x',
-            89: 'y',
-            90: 'z',
-            96: '0',
-            97: '1',
-            98: '2',
-            99: '3',
-            100: '4',
-            101: '5',
-            102: '6',
-            103: '7',
-            104: '8',
-            105: '9'
-          };
+        $parent = $this.is('input') ? $this.parent().parent() : $this.parent(),
+        $items,
+        that = $parent.data('this'),
+        index,
+        next,
+        first,
+        last,
+        prev,
+        nextPrev,
+        prevIndex,
+        isActive,
+        selector = ':not(.disabled, .hidden, .dropdown-header, .divider)',
+        keyCodeMap = {
+          32: ' ',
+          48: '0',
+          49: '1',
+          50: '2',
+          51: '3',
+          52: '4',
+          53: '5',
+          54: '6',
+          55: '7',
+          56: '8',
+          57: '9',
+          59: ';',
+          65: 'a',
+          66: 'b',
+          67: 'c',
+          68: 'd',
+          69: 'e',
+          70: 'f',
+          71: 'g',
+          72: 'h',
+          73: 'i',
+          74: 'j',
+          75: 'k',
+          76: 'l',
+          77: 'm',
+          78: 'n',
+          79: 'o',
+          80: 'p',
+          81: 'q',
+          82: 'r',
+          83: 's',
+          84: 't',
+          85: 'u',
+          86: 'v',
+          87: 'w',
+          88: 'x',
+          89: 'y',
+          90: 'z',
+          96: '0',
+          97: '1',
+          98: '2',
+          99: '3',
+          100: '4',
+          101: '5',
+          102: '6',
+          103: '7',
+          104: '8',
+          105: '9'
+        };
 
       if (that.options.liveSearch) $parent = $this.parent().parent();
 
@@ -1345,7 +1357,7 @@
 
       isActive = that.$menu.parent().hasClass('open');
 
-      if (!isActive && (e.keyCode >= 48 && e.keyCode <= 57 || event.keyCode >= 65 && event.keyCode <= 90)) {
+      if (!isActive && (e.keyCode >= 48 && e.keyCode <= 57 || e.keyCode >= 65 && e.keyCode <= 90)) {
         if (!that.options.container) {
           that.setSize();
           that.$menu.parent().addClass('open');
@@ -1430,8 +1442,8 @@
 
       } else if (!$this.is('input')) {
         var keyIndex = [],
-            count,
-            prevKey;
+          count,
+          prevKey;
 
         $items.each(function () {
           if (!$(this).parent().hasClass('disabled')) {
@@ -1463,7 +1475,7 @@
         if (!/(32)/.test(e.keyCode.toString(10))) e.preventDefault();
         if (!that.options.liveSearch) {
           var elem = $(':focus');
-          elem.click();
+          elem.trigger('click'); // Use trigger to ensure the event is handled by Bootstrap Select
           // Bring back focus for multiselects
           elem.focus();
           // Prevent screen from scrolling if the user hit the spacebar
@@ -1471,7 +1483,7 @@
           // Fixes spacebar selection of dropdown items in FF & IE
           $(document).data('spaceSelect', true);
         } else if (!/(32)/.test(e.keyCode.toString(10))) {
-          that.$menu.find('.active a').click();
+          that.$menu.find('.active a').trigger('click'); // Use trigger to ensure the event is handled by Bootstrap Select
           $this.focus();
         }
         $(document).data('keycount', 0);
@@ -1524,7 +1536,7 @@
     // The arguments of the function are explicitly re-defined from the argument list, because the shift causes them
     // to get lost/corrupted in android 2.3 and IE9 #715 #775
     var _option = option,
-        _event = event;
+      _event = event;
     [].shift.apply(args);
 
     var value;
@@ -1532,7 +1544,7 @@
       var $this = $(this);
       if ($this.is('select')) {
         var data = $this.data('selectpicker'),
-            options = typeof _option == 'object' && _option;
+          options = typeof _option == 'object' && _option;
 
         if (!data) {
           var config = $.extend({}, Selectpicker.DEFAULTS, $.fn.selectpicker.defaults || {}, $this.data(), options);
@@ -1575,18 +1587,18 @@
   };
 
   $(document)
-      .data('keycount', 0)
-      .on('keydown', '.bootstrap-select [data-toggle=dropdown], .bootstrap-select [role="menu"], .bs-searchbox input', Selectpicker.prototype.keydown)
-      .on('focusin.modal', '.bootstrap-select [data-toggle=dropdown], .bootstrap-select [role="menu"], .bs-searchbox input', function (e) {
-        e.stopPropagation();
-      });
+    .data('keycount', 0)
+    .on('keydown', '.bootstrap-select [data-toggle=dropdown], .bootstrap-select [role="menu"], .bs-searchbox input', Selectpicker.prototype.keydown)
+    .on('focusin.modal', '.bootstrap-select [data-toggle=dropdown], .bootstrap-select [role="menu"], .bs-searchbox input', function (e) {
+      e.stopPropagation();
+    });
 
   // SELECTPICKER DATA-API
   // =====================
-  $(window).on('load.bs.select.data-api', function () {
+  $(function() {
     $('.selectpicker').each(function () {
       var $selectpicker = $(this);
       Plugin.call($selectpicker, $selectpicker.data());
-    })
+    });
   });
 })(jQuery);
