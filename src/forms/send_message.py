@@ -1,7 +1,6 @@
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import TextAreaField
 from wtforms import validators
 
-
-class SendMessageForm(Form):
+class SendMessageForm(FlaskForm):
     text = TextAreaField(validators=[validators.InputRequired()])
