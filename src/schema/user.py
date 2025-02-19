@@ -3,6 +3,9 @@
 #
 #
 import itertools
+
+from sqlalchemy import String, Boolean, Integer
+from sqlalchemy.orm import Mapped, mapped_column
 from main import db
 from base import Base
 
@@ -11,7 +14,6 @@ class UserStatus(object):
     new = 'new'
     approved = 'approved'
     banned = 'banned'
-
 
 
 class UserType(object):
@@ -30,48 +32,48 @@ class EncodeMode(object):
 class User(Base):
     __tablename__ = 'user'
 
-    status = db.Column(db.String, default=UserStatus.new)   # new|approved|banned
+    status: Mapped[str] = mapped_column(String, default=UserStatus.new)   # new|approved|banned
 
     # type
-    type = db.Column(db.String)           # buyer|seller|admin
+    type: Mapped[str] = mapped_column(String)           # buyer|seller|admin
 
     # unique name required; validation should ensure that this is treated in
     # a case insensitive way
     # AKA: username
-    slug = db.Column(db.String, unique=True, index=True)
+    slug: Mapped[str] = mapped_column(String, unique=True, index=True)
 
     # non-unique display name
-    fullname = db.Column(db.String)
+    fullname: Mapped[str] = mapped_column(String)
 
     # authentication(s)
-    email = db.Column(db.String, nullable=False, index=True, unique=True, default=False)
-    email_confirmed = db.Column(db.Boolean, default=False)
+    email: Mapped[str] = mapped_column(String, nullable=False, index=True, unique=True, default=False)
+    email_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # username & password are now option
-    password = db.Column(db.String)
-    salt = db.Column(db.String)
+    password: Mapped[str] = mapped_column(String)
+    salt: Mapped[str] = mapped_column(String)
 
     # info
-    image = db.Column(db.String)
-    description = db.Column(db.String)
+    image: Mapped[str] = mapped_column(String)
+    description: Mapped[str] = mapped_column(String)
 
     # firm
-    firm = db.Column(db.Boolean)  # true if a firm
+    firm: Mapped[bool] = mapped_column(Boolean)  # true if a firm
 
     # previous investments (in cents)
-    investments = db.Column(db.Integer)
+    investments: Mapped[int] = mapped_column(Integer)
 
     # authorization
-    auth_linkedin = db.Column(db.String)
+    auth_linkedin: Mapped[str] = mapped_column(String)
 
     # links
-    linkedin = db.Column(db.String)
-    angellist = db.Column(db.String)
-    facebook = db.Column(db.String)
-    twitter = db.Column(db.String)
+    linkedin: Mapped[str] = mapped_column(String)
+    angellist: Mapped[str] = mapped_column(String)
+    facebook: Mapped[str] = mapped_column(String)
+    twitter: Mapped[str] = mapped_column(String)
 
     # credit card
-    stripe_customer_key = db.Column(db.String)
+    stripe_customer_key: Mapped[str] = mapped_column(String)
 
     @property
     def display_name(self):
@@ -85,16 +87,16 @@ class User(Base):
 
     @classmethod
     def get(cls, user_id):
-        user = User.query.get(int(user_id))
+        user = db.session.get(cls, int(user_id))
         return user if user.active else None
 
     @classmethod
     def get_by_slug(cls, slug):
-        return User.query.filter_by(active=True).filter_by(slug=slug).first()
+        return db.session.execute(db.select(cls).filter_by(active=True, slug=slug)).scalar_one_or_none()
 
     @classmethod
     def get_by_email(cls, email):
-        return User.query.filter_by(active=True).filter_by(email=email).first()
+        return db.session.execute(db.select(cls).filter_by(active=True, email=email)).scalar_one_or_none()
 
     @classmethod
     def validate_slug(cls, slug):
@@ -110,7 +112,7 @@ class User(Base):
 
         return s2
 
-    def is_approved():
+    def is_approved(self):
         return self.status == UserStatus.approved
 
     def is_buyer(self):
@@ -153,5 +155,3 @@ class User(Base):
         data['status'] = self.status
 
         return data
-
-

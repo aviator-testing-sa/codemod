@@ -1,8 +1,7 @@
-#
-# image.py - all your imaging needs
-#
-#
 from sqlalchemy import orm
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, Integer, String, Index
+
 from main import db
 from base import Base
 
@@ -10,11 +9,11 @@ from base import Base
 class ListingImage(Base):
     __tablename__ = 'listing_image'
 
-    listingid = db.Column(db.ForeignKey('listing.id'))
-    listing = orm.relationship('Listing', backref=orm.backref('images', uselist=True))
+    listingid: Mapped[int] = mapped_column(ForeignKey('listing.id'))
+    listing: Mapped["Listing"] = relationship(back_populates="images") # type: ignore
 
-    sequence = db.Column(db.Integer)
-    url = db.Column(db.String, nullable=False)
+    sequence: Mapped[int] = mapped_column(Integer)
+    url: Mapped[str] = mapped_column(String, nullable=False)
 
 
-    list_seq_idx = db.Index('listingid', 'sequence')
+    list_seq_idx = Index('listingid', 'sequence')
