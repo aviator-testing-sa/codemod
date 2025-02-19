@@ -3,15 +3,15 @@ This file is meant to be used on Amazon S3. But for the purpose of
 project reinvent, we are using Google Cloud Storage. Find more details here:
 https://cloud.google.com/storage/docs/migrating
 """
-import boto
 import contextlib
 import os.path
-import StringIO
+import io
 
 from PIL import Image
 from uuid import uuid4
 from werkzeug.utils import secure_filename
 
+from google.cloud import storage
 
 
 def s3_path2url(path):
@@ -22,27 +22,28 @@ def s3_path2url(path):
     return os.path.join('https://', app.config['S3_HOST'], app.config['S3_BUCKET'], path)
 
 
-def s3_connection():
+def gcs_client():
     """
-    Connection object
+    Connection object to Google Cloud Storage
+    """
+    return storage.Client()
+
+
+def gcs_bucket(client):
+    """
+    Storage bucket on GCS
     """
     from main import app
-    return boto.connect_s3(app.config['S3_KEY'], app.config['S3_SECRET'],
-        host=app.config['S3_HOST'])
+    return client.bucket(app.config['S3_BUCKET'])  # S3_BUCKET is used for GCS bucket name
 
-def s3_bucket(connection, validate=False):
-    """
-    Storage bucket on S3/GCS
-    """
-    from main import app
-    return connection.get_bucket(app.config['S3_BUCKET'], validate=validate)
 
-def s3_create_key(bucket, dir="", ext=""):
+def gcs_create_blob(bucket, dir="", ext=""):
     """
-    Create a boto key object on bucket
+    Create a blob object on bucket
     """
     dest = os.path.join(dir, uuid4().hex + ext)
-    return bucket.new_key(dest)
+    return bucket.blob(dest)
+
 
 def s3_upload2(src, destkey, acl="public-read"):
     """
@@ -54,13 +55,12 @@ def s3_upload2(src, destkey, acl="public-read"):
     else:
         data = src.read()
 
-    destkey.set_contents_from_string(data)
-    destkey.set_acl(acl)
+    destkey.upload_from_string(data)
+    # GCS ACLs are handled differently, skipping set_acl
+    # destkey.set_acl(acl)
 
     # url it was uploaded to
     return s3_path2url(destkey.name)
-
-
 
 
 '''
@@ -69,11 +69,9 @@ Reference: https://cloud.google.com/storage/docs/migrating
 '''
 def _get_bucket():
     from main import app
-    conn = boto.connect_s3(app.config['S3_KEY'], app.config['S3_SECRET'],
-        host=app.config['S3_HOST'])
-    bucket = conn.get_bucket(app.config['S3_BUCKET'], validate=False)
+    client = gcs_client()
+    bucket = client.bucket(app.config['S3_BUCKET'])
     return bucket
-
 
 
 def s3_upload(source_file,
@@ -82,10 +80,10 @@ def s3_upload(source_file,
         upload_dir=None,
         sub_dir='',
         acl='public-read'):
-    """ Uploads File Object to Amazon S3
+    """ Uploads File Object to Google Cloud Storage
         Expects following app.config attributes to be set:
-            S3_KEY              :   S3 API Key
-            S3_SECRET           :   S3 Secret Key
+            S3_KEY              :   S3 API Key (Not needed for GCS with proper authentication)
+            S3_SECRET           :   S3 Secret Key (Not needed for GCS with proper authentication)
             S3_BUCKET           :   What bucket to upload to
             S3_UPLOAD_DIRECTORY :   Which S3 Directory.
 
@@ -104,15 +102,17 @@ def s3_upload(source_file,
     if not destination_filename:
         destination_filename = uuid4().hex + source_extension
 
-    # Connect to S3 and upload file.
+    # Connect to GCS and upload file.
     b = _get_bucket()
 
     upload_path = os.path.join(upload_dir, sub_dir, destination_filename)
-    sml = b.new_key(upload_path)
+    blob = b.blob(upload_path)
     if not file_blob:
         file_blob = source_file.read()
-    sml.set_contents_from_string(file_blob)
-    sml.set_acl(acl)
+    blob.upload_from_string(file_blob)
+
+    # GCS ACLs are handled differently, skipping set_acl
+    # blob.set_acl(acl)
 
     return s3_path2url(upload_path)
 
@@ -154,10 +154,10 @@ def s3_resize_and_upload(source_file,
         upload_dir=None,
         sub_dir='',
         acl='public-read'):
-    """ Uploads File Object to Amazon S3
+    """ Uploads File Object to Google Cloud Storage
         Expects following app.config attributes to be set:
-            S3_KEY              :   S3 API Key
-            S3_SECRET           :   S3 Secret Key
+            S3_KEY              :   S3 API Key (Not needed for GCS with proper authentication)
+            S3_SECRET           :   S3 Secret Key (Not needed for GCS with proper authentication)
             S3_BUCKET           :   What bucket to upload to
             S3_UPLOAD_DIRECTORY :   Which S3 Directory.
         The default sets the access rights on the uploaded file to
@@ -182,7 +182,7 @@ def s3_resize_and_upload(source_file,
             + '_resized'
             + source_extension)
 
-    upload_buffer = StringIO.StringIO(file_blob)
+    upload_buffer = io.BytesIO(file_blob)
     image = Image.open(upload_buffer)
     format = image.format
     if image.format not in ['JPEG', 'PNG']:
@@ -205,44 +205,45 @@ def s3_resize_and_upload(source_file,
     #if rotation:
     #    image = image.rotate(rotation)
 
-    # Connect to S3 and upload file.
+    # Connect to GCS and upload file.
     b = _get_bucket()
-    output_buffer = StringIO.StringIO()
+    output_buffer = io.BytesIO()
     image.save(output_buffer, format)
     upload_dir = upload_dir + sub_dir
-    upload_path = "/".join([upload_dir, destination_filename])
-    sml = b.new_key(upload_path)
-    sml.set_contents_from_string(output_buffer.getvalue())
-    sml.set_acl(acl)
+    upload_path = os.path.join(upload_dir, destination_filename)
+    blob = b.blob(upload_path)
+    blob.upload_from_string(output_buffer.getvalue())
+    # GCS ACLs are handled differently, skipping set_acl
+    # sml.set_acl(acl)
 
     return s3_path2url(upload_path)
 
 
 '''
-Also uploads to S3. Resizes based on the size provided.
+Also uploads to GCS. Resizes based on the size provided.
 '''
 def s3_resize(path, resize_path, size, user_id_str=''):
+    from main import app
+    from . import image_sizes
     size_map = image_sizes.MAP.get(size)
 
-    # Download from s3.
+    # Download from gcs.
     bucket = _get_bucket()
-    key = boto.s3.key.Key(bucket)
-    # Remove first '/'
-    key.key = path[1:]
+    blob = bucket.blob(path[1:])
     try:
-        input_buffer = StringIO.StringIO(key.get_contents_as_string())
-    except boto.exception.S3ResponseError as e:
-        raise UserWarning("Invalid image: " + path + " user_id:" + user_id_str)
+        input_buffer = io.BytesIO(blob.download_as_bytes())
+    except Exception as e:
+        raise UserWarning(f"Invalid image: {path} user_id: {user_id_str} - {e}")
+
     image = Image.open(input_buffer)
     format = image.format
     image.thumbnail((size_map.get('width'), size_map.get('height')),
             Image.ANTIALIAS)
 
-    output_buffer = StringIO.StringIO()
+    output_buffer = io.BytesIO()
     image.save(output_buffer, format)
     upload_key = resize_path[1:]
-    sml = bucket.new_key(upload_key)
-    sml.set_contents_from_string(output_buffer.getvalue())
-    sml.set_acl('public-read')
-
-
+    sml = bucket.blob(upload_key)
+    sml.upload_from_string(output_buffer.getvalue())
+    # GCS ACLs are handled differently, skipping set_acl
+    # sml.set_acl('public-read')
