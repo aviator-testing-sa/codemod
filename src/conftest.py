@@ -1,7 +1,3 @@
-#
-#
-#
-#
 import contextlib
 import os
 import pytest
@@ -28,7 +24,7 @@ def db(app, request):
     return db
 
 
-@pytest.yield_fixture(scope='session')
+@pytest.fixture(scope='session')
 def mailserver(app):
     import mailserver
     server = mailserver.debug_server(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
@@ -43,40 +39,37 @@ def mail(app, mailserver, request):
     return mail
 
 
-@pytest.yield_fixture(scope='function')
-def session(db, request):
+@pytest.fixture(scope='function')
+def session(db):
     """Creates a new database session for a test."""
     connection = db.engine.connect()
     transaction = connection.begin()
 
-    options = dict(bind=connection, binds={})
-    session = db.create_scoped_session(options=options)
+    options = dict(bind=connection)
+    # Use sessionmaker directly with options
+    Session = sqlalchemy.orm.sessionmaker(bind=connection)
+    session = Session()
 
-    session.begin_nested()
+    nested = connection.begin_nested()
 
-    # session is actually a scoped_session
-    # for the `after_transaction_end` event, we need a session instance to
-    # listen for, hence the `session()` call
-    @sqlalchemy.event.listens_for(session(), 'after_transaction_end')
-    def restart_savepoint(sess, trans):
-        if trans.nested and not trans._parent.nested:
-            session.expire_all()
-            session.begin_nested()
+    @sqlalchemy.event.listens_for(session.bind, "after_transaction_end")
+    def end_nested_transaction(db_connection, transaction):
+        nonlocal nested
+        if not nested.is_valid:
+            nested = connection.begin_nested()
 
     db.session = session
-
     yield session
 
-    session.remove()
+    session.close()
     transaction.rollback()
     connection.close()
 
 
-@pytest.yield_fixture(scope='function')
+@pytest.fixture(scope='function')
 def client(session):
     """A Flask test client. An instance of :class:`flask.testing.TestClient`
     by default.
     """
     with main.app.test_client() as client:
         yield client
-

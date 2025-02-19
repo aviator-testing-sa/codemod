@@ -6,11 +6,11 @@ import binascii
 import datetime
 import functools
 import hashlib
-import httplib
+import http
 import json
 import os
 import re
-import urllib
+import urllib.parse
 from unicodedata import normalize
 
 #
@@ -28,7 +28,7 @@ def response(encoder, *opts, **kwopts):
 def _json_encoder_response(data, **kwargs):
     import flask
     r = flask.jsonify(data)
-    for k,v in kwargs.iteritems():
+    for k,v in kwargs.items():
         setattr(r, k, v)
     return r
 
@@ -62,7 +62,7 @@ def abort(code, **kwargs):
     import flask
     return flask.abort(code, response=flask.jsonify(**kwargs))
 
-def jsonify(code=httplib.OK, **kwargs):
+def jsonify(code=http.HTTPStatus.OK, **kwargs):
     import flask
     r = flask.jsonify(**kwargs)
     r.status_code = code
@@ -76,7 +76,7 @@ def slugify(text, delim=u'-'):
         word = normalize('NFKD', word).encode('ascii', 'ignore')
         if word:
             result.append(word)
-    return unicode(delim.join(result))
+    return str(delim.join(x.decode('ascii') for x in result))
 
 
 def buildurl(base, *args, **kwargs):
@@ -89,11 +89,11 @@ def buildurl(base, *args, **kwargs):
         endpoint = base
 
     def _gen():
-        for k,v in kwargs.iteritems():
+        for k,v in kwargs.items():
             if not isinstance(v, (tuple, list)):
                 v = v,
             for val in v:
-                yield "%s=%s" % (k, urllib.quote_plus(str(val)))
+                yield "%s=%s" % (k, urllib.parse.quote_plus(str(val)))
 
     return "?".join([ endpoint, "&".join(_gen()) ])
 
@@ -105,10 +105,10 @@ def buildurl(base, *args, **kwargs):
 # cryptographic
 #
 def encrypt_with_salt(string, salt):
-    return hashlib.sha1(string + salt).hexdigest()
+    return hashlib.sha1(string.encode('utf-8') + salt.encode('utf-8')).hexdigest()
 
 def encrypt_with_new_salt(string, bytes=16):
-    salt = binascii.b2a_hex(os.urandom(bytes))
+    salt = binascii.b2a_hex(os.urandom(bytes)).decode('utf-8')
     return salt, encrypt_with_salt(string, salt)
 
 
@@ -156,4 +156,3 @@ def pretty_date(time):
     if day_diff < 365:
         return str(day_diff / 30) + " months ago"
     return str(day_diff / 365) + " years ago"
-
