@@ -102,9 +102,9 @@
             }
 
             if (binding === 'unbind') {
-                (this.options.binder).unbind('smartscroll.infscr.' + instance.options.infid);
+                (this.options.binder).off('smartscroll.infscr.' + instance.options.infid);
             } else {
-                (this.options.binder)[binding]('smartscroll.infscr.' + instance.options.infid, function () {
+                (this.options.binder).on('smartscroll.infscr.' + instance.options.infid, function () {
                     instance.scroll();
                 });
             }
@@ -184,7 +184,7 @@
                 }
 
                 if (opts.prefill) {
-                    $window.bind('resize.infinite-scroll', instance._prefill);
+                    $window.on('resize.infinite-scroll', instance._prefill);
                 }
             };
 
@@ -222,9 +222,9 @@
                     instance.scroll();
                 }
 
-                $window.bind('resize.infinite-scroll', function() {
+                $window.on('resize.infinite-scroll', function() {
                     if (needsPrefill()) {
-                        $window.unbind('resize.infinite-scroll');
+                        $window.off('resize.infinite-scroll');
                         instance.scroll();
                     }
                 });

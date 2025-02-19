@@ -32,7 +32,13 @@
       if (detail == null) {
         detail = null;
       }
-      if (document.createEvent != null) {
+      if (typeof window.CustomEvent === 'function') {
+        customEvent = new CustomEvent(event, {
+          bubbles: bubble,
+          cancelable: cancel,
+          detail: detail
+        });
+      } else if (document.createEvent != null) {
         customEvent = document.createEvent('CustomEvent');
         customEvent.initCustomEvent(event, bubble, cancel, detail);
       } else if (document.createEventObject != null) {
@@ -521,4 +527,3 @@ ANIMATION -->
           live:         true        // default
       })
       wow.init();
-      

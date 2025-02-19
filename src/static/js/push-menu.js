@@ -1,42 +1,46 @@
 function disableOther(s) {
-    "showLeft" !== s && classie.toggle(showLeft, "disabled")
-}! function(s) {
+    if (s !== "showLeft") {
+        showLeft.classList.toggle("disabled");
+    }
+}
+
+(function(s) {
     "use strict";
 
-    function e(s) {
-        return new RegExp("(^|\\s+)" + s + "(\\s+|$)")
-    }
+    // Modernizr.js or similar library handles classList support
+    s.classie = {
+        hasClass: function(elem, className) {
+            return elem.classList.contains(className);
+        },
+        addClass: function(elem, className) {
+            elem.classList.add(className);
+        },
+        removeClass: function(elem, className) {
+            elem.classList.remove(className);
+        },
+        toggleClass: function(elem, className) {
+            elem.classList.toggle(className);
+        },
+        has: function(elem, className) {
+            return elem.classList.contains(className);
+        },
+        add: function(elem, className) {
+            elem.classList.add(className);
+        },
+        remove: function(elem, className) {
+            elem.classList.remove(className);
+        },
+        toggle: function(elem, className) {
+            elem.classList.toggle(className);
+        }
+    };
+})(window);
 
-    function t(s, e) {
-        var t = n(s, e) ? c : a;
-        t(s, e)
-    }
-    var n, a, c;
-    "classList" in document.documentElement ? (n = function(s, e) {
-        return s.classList.contains(e)
-    }, a = function(s, e) {
-        s.classList.add(e)
-    }, c = function(s, e) {
-        s.classList.remove(e)
-    }) : (n = function(s, t) {
-        return e(t).test(s.className)
-    }, a = function(s, e) {
-        n(s, e) || (s.className = s.className + " " + e)
-    }, c = function(s, t) {
-        s.className = s.className.replace(e(t), " ")
-    }), s.classie = {
-        hasClass: n,
-        addClass: a,
-        removeClass: c,
-        toggleClass: t,
-        has: n,
-        add: a,
-        remove: c,
-        toggle: t
-    }
-}(window);
-var menuLeft = document.getElementById("cbp-spmenu-s1"),
-    body = document.body;
+var menuLeft = document.getElementById("cbp-spmenu-s1");
+var body = document.body;
+
 showLeft.onclick = function() {
-    classie.toggle(this, "active"), classie.toggle(menuLeft, "cbp-spmenu-open"), disableOther("showLeft")
+    this.classList.toggle("active");
+    menuLeft.classList.toggle("cbp-spmenu-open");
+    disableOther("showLeft");
 };
