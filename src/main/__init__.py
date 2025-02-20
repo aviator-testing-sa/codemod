@@ -13,24 +13,27 @@ from flask import redirect
 from flask import render_template
 from flask import request
 from flask import session
-from flask.ext.login import LoginManager
-from flask.ext.login import current_user
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
+from flask_login import current_user
+from flask_sqlalchemy import SQLAlchemy
 from raven.contrib.flask import Sentry
 from user.current_user import CurrentUser
 from user.current_user import Anonymous
+from flask_wtf.csrf import CSRFProtect
+
 
 '''
 The main application setup. The order of things is important
 in this file.
 '''
-from flask_wtf.csrf import CsrfProtect
-csrf = CsrfProtect()
+
+csrf = CSRFProtect()
+
 
 def create_app(testing=False):
     app = Flask(__name__, static_folder='../static', template_folder='../templates')
     app.config.from_object('config.base')
-    app.config.from_envvar('APP_CONFIG_FILE')
+    app.config.from_envvar('APP_CONFIG_FILE', silent=True)  # Use silent=True to avoid errors if the env var is not set.
     app.config['APP_ROOT'] = os.path.dirname(os.path.abspath(__file__))
     app.config['ENVIRONMENT'] = os.environ.get('ENVIRONMENT', 'dev')
 
@@ -76,8 +79,9 @@ mail = create_mail(app)
 '''
 Initialize sentry and enable logging.
 '''
-sentry = Sentry(app, logging=True, level=logging.ERROR,
-    dsn=app.config.get('SENTRY_DSN', ''))
+sentry = Sentry(app) # Removed logging=True, level=logging.ERROR, dsn=app.config.get('SENTRY_DSN', '') - configure Sentry via DSN in config
+if app.config.get('SENTRY_DSN'): #only initialise if dsn exists
+    sentry = Sentry(app,dsn=app.config.get('SENTRY_DSN'))
 
 if app.config['DEBUG']:
     logging.getLogger().addHandler(logging.StreamHandler())
@@ -91,7 +95,7 @@ login_manager.anonymous_user = Anonymous
 
 @login_manager.user_loader
 def load_user(userid):
-    user = schema.user.User.query.get(userid)
+    user = db.session.get(schema.user.User, int(userid)) # Use db.session.get for SQLAlchemy 2.0+
     if user:
         return CurrentUser(user)
     return None
