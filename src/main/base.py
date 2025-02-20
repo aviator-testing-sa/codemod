@@ -1,6 +1,8 @@
 import datetime
 import utils
-from main import app
+from flask import Flask
+
+app = Flask(__name__)
 
 @app.context_processor
 def inject_params():
