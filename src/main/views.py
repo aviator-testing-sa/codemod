@@ -5,8 +5,8 @@ from flask import redirect
 from flask import render_template
 from flask import send_from_directory
 from flask import url_for
-from flask.ext.login import current_user
-from flask.ext.login import login_required
+from flask_login import current_user
+from flask_login import login_required
 from main import app
 
 @app.route('/')
@@ -23,5 +23,6 @@ def contact():
 def email():
 	user = current_user.user
 	from schema.listing import Listing
-	listing = Listing.query.get(6)
+	# Updated to SQLAlchemy 2.1 style - get() is now get_one()
+	listing = Listing.query.get_one(6)
 	return render_template('emails/welcome.html', listing=listing, user=user)
