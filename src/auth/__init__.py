@@ -1,5 +1,6 @@
 import utils
-from flask.ext.login import current_user
+# Changed from flask.ext.login to flask_login as the flask.ext namespace was deprecated
+from flask_login import current_user
 from functools import wraps
 
 
@@ -21,7 +22,7 @@ def seller_required(func):
             (current_user.user.is_seller() or current_user.user.is_admin()):
             return func(*args, **kwargs)
         else:
-            print "ABORTING@@"
+            # Changed from print statement to print function for Python 3 compatibility
+            print("ABORTING@@")
             return utils.abort(400, detail="Not an authorized seller")
     return wrapped
-

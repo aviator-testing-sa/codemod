@@ -1,7 +1,8 @@
 import flask
 import flask_wtf
 import hashlib
-import httplib
+# Changed httplib to http.client for Python 3 compatibility
+import http.client
 import itsdangerous
 import logging
 import os
@@ -19,10 +20,14 @@ import utils
 
 
 def login_user(user, remember=False):
-    flask.ext.login.login_user(CurrentUser(user), remember=remember)
+    # Updated deprecated flask.ext.login import to flask_login
+    import flask_login
+    flask_login.login_user(CurrentUser(user), remember=remember)
 
 def logout_user():
-    flask.ext.login.logout_user()
+    # Updated deprecated flask.ext.login import to flask_login
+    import flask_login
+    flask_login.logout_user()
 
 def get_user_by_name(name):
     """
@@ -125,7 +130,8 @@ def create_confirm_email(username, email, token):
             username=username, confirm_url=url, support_email=app.config['SUPPORT_EMAIL'])
 
     '''
-    msg = flask.ext.mail.Message(
+    # Updated flask.ext.mail import to flask_mail
+    msg = flask_mail.Message(
         sender=app.config['SUPPORT_EMAIL'],
         recipients=[email],
         subject="Activate account on Reinvent",
@@ -154,7 +160,8 @@ def create_reset_email(username, email, token):
         support_email=app.config['SUPPORT_EMAIL'])
 
     '''
-    msg = flask.ext.mail.Message(
+    # Updated flask.ext.mail import to flask_mail
+    msg = flask_mail.Message(
         sender=app.config['SUPPORT_EMAIL'],
         recipients=[email],
         subject="Reset your password on Reinvent",
@@ -173,7 +180,10 @@ def send_reset_email_by_user(user):
 
 def validate_email(email):
     # Check if the user is already registered.
-    user = schema.User.query.filter_by(email_id=email).first()
+    # Updated to use the select() API in SQLAlchemy 2.0+
+    from sqlalchemy import select
+    stmt = select(schema.User).filter_by(email_id=email)
+    user = db.session.execute(stmt).scalar_one_or_none()
     if user:
         raise UserWarning("Email Already exists")
     if not _is_valid_email(email):
@@ -225,7 +235,8 @@ def get_access_linkedin(code, confirm_url=None):
     r = requests.post(url, data=data)
     if not r.ok:
         logging.error(r.content)
-        flask.abort(httplib.FORBIDDEN)
+        # Updated httplib to http.client for Python 3 compatibility
+        flask.abort(http.client.FORBIDDEN)
 
     return r.json()
 
@@ -241,6 +252,7 @@ def get_profile_linkedin(token, name='~', fields=['email-address', 'picture-url'
     r = requests.get(url, headers=headers)
     if not r.ok:
         logging.error(r.content)
-        flask.abort(httplib.BAD_REQUEST)
+        # Updated httplib to http.client for Python 3 compatibility
+        flask.abort(http.client.BAD_REQUEST)
 
     return r.json()
