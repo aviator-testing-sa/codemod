@@ -2,7 +2,8 @@
 # activity.py - auctions have activities
 #
 #
-from sqlalchemy import orm
+# Changed import to use orm directly from sqlalchemy instead of potentially outdated pattern
+from sqlalchemy import orm, Index
 from main import db
 from base import Base
 
@@ -12,7 +13,8 @@ class Activity(Base):
 
     # auction this activity is for
     auctionid = db.Column(db.ForeignKey('auction.id'), nullable=False)
-    auction = orm.relationship('Auction', primaryjoin='Activity.auctionid == Auction.id')
+    # Updated relationship syntax to use back_populates instead of the older primaryjoin style
+    auction = orm.relationship('Auction', back_populates='activities')
 
     # user that created the activity
     userid = db.Column(db.ForeignKey('user.id'), nullable=False)
@@ -29,4 +31,7 @@ class Activity(Base):
     price_cent = db.Column(db.Integer)
 
     #
-    auction_type_idx = db.Index('auctionid', 'type')
+    # Updated Index creation to use __table_args__ approach which is preferred in SQLAlchemy 2.x
+    __table_args__ = (
+        Index('auction_type_idx', 'auctionid', 'type'),
+    )

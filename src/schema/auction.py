@@ -1,4 +1,3 @@
-#
 # auction.py
 #
 #
@@ -22,7 +21,9 @@ class Auction(Base):
     listingid = db.Column(db.ForeignKey('listing.id', ondelete='CASCADE'), nullable=True)
     accepted_bid_id = db.Column(db.ForeignKey('activity.id', ondelete='SET NULL'), nullable=True)
 
-    listing = orm.relationship('Listing', backref=orm.backref('auctions', uselist=True))
+    # Changed from using backref parameter to back_populates in relationship declarations
+    # as backref is deprecated in favor of back_populates in SQLAlchemy 2.x
+    listing = orm.relationship('Listing', back_populates='auctions')
     user = orm.relationship('User')
 
     def has_expired(self):

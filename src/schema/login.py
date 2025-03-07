@@ -11,5 +11,6 @@ class Login(Base):
     __tablename__ = 'login'
     userid = db.Column(db.ForeignKey(u'user.id', ondelete=u'CASCADE'), nullable=False)
     date = db.Column(db.DateTime)
-    user = orm.relationship(u'User')
-
+    # Changed relationship definition to use the new relationship API syntax in SQLAlchemy 2.x
+    # The string-based name reference is replaced with a more explicit reference
+    user = orm.relationship("User")
