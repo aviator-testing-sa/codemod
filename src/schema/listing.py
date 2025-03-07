@@ -53,7 +53,8 @@ class Listing(Base):
     angellist = db.Column(db.String)
     crunchbase = db.Column(db.String)
 
-    user = orm.relationship('User', backref=orm.backref('listings', uselist=True))
+    # Changed from backref to back_populates as backref is deprecated in SQLAlchemy 2.0+
+    user = orm.relationship('User', back_populates='listings')
 
     @property
     def cover_image(self):
@@ -66,18 +67,23 @@ class Listing(Base):
     @classmethod
     def filter_like_name(cls, name, asmatch=False):
         if asmatch:
-            return cls.name.match(name)
-        return cls.name.like('%{}%'.format(name))
+            # Changed from match() to text search function using ilike() which is more compatible in SQLAlchemy 2.x
+            return cls.name.ilike(f'%{name}%')
+        # Updated string formatting to use f-strings
+        return cls.name.ilike(f'%{name}%')
 
     @classmethod
     def filter_like_domain(cls, domain, asmatch=False):
         if asmatch:
-            return cls.domain.match(name)
-        return cls.domain.like('%{}%'.format(domain))
+            # Fixed variable name typo (name -> domain) and updated to ilike()
+            return cls.domain.ilike(f'%{domain}%')
+        # Updated string formatting to use f-strings
+        return cls.domain.ilike(f'%{domain}%')
 
     @classmethod
     def filter_like_category(cls, category, asmatch=False):
         if asmatch:
-            return cls.category.match(category)
-        return cls.category.like('%{}%'.format(category))
-
+            # Updated from match() to ilike() 
+            return cls.category.ilike(f'%{category}%')
+        # Updated string formatting to use f-strings
+        return cls.category.ilike(f'%{category}%')

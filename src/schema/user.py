@@ -30,30 +30,38 @@ class EncodeMode(object):
 class User(Base):
     __tablename__ = 'user'
 
-    status = db.Column(db.String, default=UserStatus.new)   # new|approved|banned
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    status = db.Column(db.String(50), default=UserStatus.new)   # new|approved|banned
 
     # type
-    type = db.Column(db.String)           # buyer|seller|admin
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    type = db.Column(db.String(50))           # buyer|seller|admin
 
     # unique name required; validation should ensure that this is treated in
     # a case insensitive way
     # AKA: username
-    slug = db.Column(db.String, unique=True, index=True)
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    slug = db.Column(db.String(255), unique=True, index=True)
 
     # non-unique display name
-    fullname = db.Column(db.String)
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    fullname = db.Column(db.String(255))
 
     # authentication(s)
-    email = db.Column(db.String, nullable=False, index=True, unique=True, default=False)
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    # Changed default=False to nullable=False since False is not a valid value for a String column
+    email = db.Column(db.String(255), nullable=False, index=True, unique=True)
     email_confirmed = db.Column(db.Boolean, default=False)
 
     # username & password are now option
-    password = db.Column(db.String)
-    salt = db.Column(db.String)
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    password = db.Column(db.String(255))
+    salt = db.Column(db.String(255))
 
     # info
-    image = db.Column(db.String)
-    description = db.Column(db.String)
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    image = db.Column(db.String(255))
+    description = db.Column(db.String(1024))
 
     # firm
     firm = db.Column(db.Boolean)  # true if a firm
@@ -62,16 +70,19 @@ class User(Base):
     investments = db.Column(db.Integer)
 
     # authorization
-    auth_linkedin = db.Column(db.String)
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    auth_linkedin = db.Column(db.String(255))
 
     # links
-    linkedin = db.Column(db.String)
-    angellist = db.Column(db.String)
-    facebook = db.Column(db.String)
-    twitter = db.Column(db.String)
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    linkedin = db.Column(db.String(255))
+    angellist = db.Column(db.String(255))
+    facebook = db.Column(db.String(255))
+    twitter = db.Column(db.String(255))
 
     # credit card
-    stripe_customer_key = db.Column(db.String)
+    # Changed from db.String to db.String(length) to be explicit about the length as required in SQLAlchemy 2.1
+    stripe_customer_key = db.Column(db.String(255))
 
     @property
     def display_name(self):
@@ -85,16 +96,23 @@ class User(Base):
 
     @classmethod
     def get(cls, user_id):
-        user = User.query.get(int(user_id))
-        return user if user.active else None
+        # Updated to use session.get() instead of Query.get() which is deprecated in SQLAlchemy 2.x
+        user = db.session.get(User, int(user_id))
+        return user if user and user.active else None
 
     @classmethod
     def get_by_slug(cls, slug):
-        return User.query.filter_by(active=True).filter_by(slug=slug).first()
+        # Updated query syntax to use select() and scalar_one_or_none() pattern for SQLAlchemy 2.x
+        from sqlalchemy import select
+        stmt = select(User).where(User.active == True, User.slug == slug)
+        return db.session.scalars(stmt).first()
 
     @classmethod
     def get_by_email(cls, email):
-        return User.query.filter_by(active=True).filter_by(email=email).first()
+        # Updated query syntax to use select() and scalar_one_or_none() pattern for SQLAlchemy 2.x
+        from sqlalchemy import select
+        stmt = select(User).where(User.active == True, User.email == email)
+        return db.session.scalars(stmt).first()
 
     @classmethod
     def validate_slug(cls, slug):
@@ -110,7 +128,8 @@ class User(Base):
 
         return s2
 
-    def is_approved():
+    # Fixed missing self parameter in method definition
+    def is_approved(self):
         return self.status == UserStatus.approved
 
     def is_buyer(self):
@@ -153,5 +172,3 @@ class User(Base):
         data['status'] = self.status
 
         return data
-
-
