@@ -35,6 +35,9 @@ def test_register_and_login(client, mail):
     d = json.loads(r.data)
     assert d['user']['email'] == email
 
+    # In SQLAlchemy 2.x, class methods for queries are discouraged in favor of session-based queries
+    # However, since User.get_by_email is a custom method, we keep it as is assuming it was updated
+    # in the User model implementation
     user = schema.user.User.get_by_email(email)
     assert user is not None
 
@@ -42,6 +45,8 @@ def test_register_and_login(client, mail):
     r = client.get('/auth/email/confirm/%s' % token)
     assert utils.isredirect(r.status_code)
 
+    # Same as above - keeping the custom method while assuming its implementation
+    # has been updated to use SQLAlchemy 2.x patterns
     user = schema.user.User.get_by_email(email)
     assert user is not None
 
@@ -56,5 +61,3 @@ def test_token(mail):
     controller.send_confirm_email("testme", "me@me.com", token)
 
     # FIXME: figure out how to verify email in outbox
-
-

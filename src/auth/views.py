@@ -1,4 +1,4 @@
-import httplib
+import http.client as httplib  # Changed from import httplib to import http.client as httplib
 import itertools
 import logging
 import emails
@@ -12,10 +12,11 @@ from flask import render_template
 from flask import request
 from flask import session
 from flask import url_for
-from flask.ext.login import current_user
-from flask.ext.login import login_user
-from flask.ext.login import logout_user
-from flask.ext.login import login_required
+# Changed from flask.ext.login to flask_login
+from flask_login import current_user
+from flask_login import login_user
+from flask_login import logout_user
+from flask_login import login_required
 
 from forms.reset_password import ResetPasswordForm
 from main import app, db
@@ -30,7 +31,8 @@ import requests
 
 @app.post('/api/login')
 def api_login():
-    form = forms.auth.Login(request.form, csrf_enabled=False)
+    # Changed csrf_enabled to csrf param
+    form = forms.auth.Login(request.form, csrf=False)
     if not form.validate():
         utils.abort(httplib.BAD_REQUEST, errors=form.errors)
 
@@ -43,7 +45,8 @@ def api_login():
 
 @app.post('/api/register')
 def api_register():
-    form = forms.auth.Signup(request.form, csrf_enabled=False)
+    # Changed csrf_enabled to csrf param
+    form = forms.auth.Signup(request.form, csrf=False)
     if not form.validate():
         utils.abort(httplib.BAD_REQUEST, errors=form.errors)
 
@@ -137,6 +140,7 @@ def confirm_email(token):
     # confirm if not already confirmed
     if not user.email_confirmed:
         user.email_confirmed = True
+        # No changes needed for db.session.add/commit in SQLAlchemy 2.1
         db.session.add(user)
         db.session.commit()
 
@@ -221,7 +225,8 @@ def linkedin_confirm():
     new_signup = False
     if user is None:
         # slugify
-        slug = schema.user.User.validate_slug(utils.slugify(unicode(fullname)))
+        # Changed unicode() to str() as unicode is removed in Python 3
+        slug = schema.user.User.validate_slug(utils.slugify(str(fullname)))
         user = schema.user.User(
             slug=slug,
             email=email,
@@ -237,6 +242,7 @@ def linkedin_confirm():
     # FIXME: stash access token & expiration in current user OR db?
     user.auth_linkedin = code
 
+    # No changes needed for db.session.add/commit in SQLAlchemy 2.1
     db.session.add(user)
     db.session.commit()
 
@@ -247,10 +253,6 @@ def linkedin_confirm():
     if new_signup:
         emails.welcome(user)
     return redirect(session.get('next_url') or '/')
-
-
-
-
 def login_as(user_id):
     user = base_controller.get_user(user_id)
     _login_user(user)
@@ -261,8 +263,10 @@ def validate_email():
     email = request.args.get('email', '')
     try:
         controller.validate_email(email)
+    # Changed from e.message to str(e) as SQLAlchemy 2.x exceptions follow Python standards
+    # where message attribute is deprecated in favor of stringifying the exception
     except UserWarning as e:
-        return jsonify(success=False, error=e.message)
+        return jsonify(success=False, error=str(e))
     return jsonify(success=True)
 
 
@@ -285,7 +289,9 @@ def forgot_password():
         else:
             error='Cannot find email.'
 
-    if request.is_xhr:
+    # Changed is_xhr check to a more modern approach as this property is deprecated
+    # when upgrading SQLAlchemy we often upgrade Flask dependencies too
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify(success=bool(success), error=error)
 
     return render_template('auth/forgot_password.html', success=success, error=error)
@@ -331,4 +337,3 @@ def change_password():
 def _login_user(user, remember=True):
     logged_in_user = CurrentUser(user)
     login_user(logged_in_user, remember=remember)
-
