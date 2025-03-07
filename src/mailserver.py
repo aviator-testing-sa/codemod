@@ -1,26 +1,30 @@
 """
 Mail server stuff goes hered
 """
+# The original code used asyncore and smtpd modules which are deprecated in modern Python.
+# Replaced with aiosmtpd which is the recommended replacement.
 import contextlib
-import asyncore
-import smtpd
+import asyncio
+from aiosmtpd.controller import Controller
 import multiprocessing
 import threading
 
 
 
 class Threaded(object):
-    def __init__(self, smtp):
-        self.smtp = smtp
-        self.thread = threading.Thread(target=asyncore.loop,
-                kwargs={'timeout' : 1})
-        self.thread.start()
+    def __init__(self, controller):
+        # Changed from asyncore.loop to using aiosmtpd's Controller
+        # which handles its own threading
+        self.controller = controller
+        self.controller.start()
 
     def close(self):
-        self.smtp.close()
-        self.thread.join()
+        # Changed to use controller shutdown instead of asyncore approach
+        self.controller.stop()
 
 
 def debug_server(host, port):
-    smtp = smtpd.DebuggingServer((host, port), None)
-    return Threaded(smtp)
+    # Changed from smtpd.DebuggingServer to aiosmtpd's Controller with debugging handler
+    from aiosmtpd.handlers import Debugging
+    controller = Controller(Debugging(), hostname=host, port=port)
+    return Threaded(controller)

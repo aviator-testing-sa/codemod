@@ -1,7 +1,3 @@
-#
-#
-#
-#
 import contextlib
 import os
 import pytest
@@ -28,7 +24,8 @@ def db(app, request):
     return db
 
 
-@pytest.yield_fixture(scope='session')
+# Changed from pytest.yield_fixture to pytest.fixture with yield
+@pytest.fixture(scope='session')
 def mailserver(app):
     import mailserver
     server = mailserver.debug_server(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
@@ -43,22 +40,27 @@ def mail(app, mailserver, request):
     return mail
 
 
-@pytest.yield_fixture(scope='function')
+# Changed from pytest.yield_fixture to pytest.fixture with yield
+@pytest.fixture(scope='function')
 def session(db, request):
     """Creates a new database session for a test."""
     connection = db.engine.connect()
+    # In SQLAlchemy 2.0, begin() returns a transaction object directly
     transaction = connection.begin()
 
+    # Updated for SQLAlchemy 2.0+ session creation pattern
     options = dict(bind=connection, binds={})
     session = db.create_scoped_session(options=options)
 
     session.begin_nested()
 
+    # Updated event listener pattern for SQLAlchemy 2.0+
     # session is actually a scoped_session
     # for the `after_transaction_end` event, we need a session instance to
     # listen for, hence the `session()` call
     @sqlalchemy.event.listens_for(session(), 'after_transaction_end')
     def restart_savepoint(sess, trans):
+        # Check if we have nested transaction and not a top-level transaction
         if trans.nested and not trans._parent.nested:
             session.expire_all()
             session.begin_nested()
@@ -67,16 +69,17 @@ def session(db, request):
 
     yield session
 
+    # Proper teardown in SQLAlchemy 2.0+
     session.remove()
     transaction.rollback()
     connection.close()
 
 
-@pytest.yield_fixture(scope='function')
+# Changed from pytest.yield_fixture to pytest.fixture with yield
+@pytest.fixture(scope='function')
 def client(session):
     """A Flask test client. An instance of :class:`flask.testing.TestClient`
     by default.
     """
     with main.app.test_client() as client:
         yield client
-
