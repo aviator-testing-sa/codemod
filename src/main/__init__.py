@@ -13,9 +13,11 @@ from flask import redirect
 from flask import render_template
 from flask import request
 from flask import session
-from flask.ext.login import LoginManager
-from flask.ext.login import current_user
-from flask.ext.sqlalchemy import SQLAlchemy
+# Changed import from flask.ext.login to flask_login to match modern import conventions
+from flask_login import LoginManager
+from flask_login import current_user
+# Changed import from flask.ext.sqlalchemy to flask_sqlalchemy to match modern import conventions
+from flask_sqlalchemy import SQLAlchemy
 from raven.contrib.flask import Sentry
 from user.current_user import CurrentUser
 from user.current_user import Anonymous
@@ -24,8 +26,9 @@ from user.current_user import Anonymous
 The main application setup. The order of things is important
 in this file.
 '''
-from flask_wtf.csrf import CsrfProtect
-csrf = CsrfProtect()
+# Updated import for CsrfProtect which is now CSRFProtect (capitalization change)
+from flask_wtf.csrf import CSRFProtect
+csrf = CSRFProtect()
 
 def create_app(testing=False):
     app = Flask(__name__, static_folder='../static', template_folder='../templates')
@@ -65,8 +68,9 @@ import schema
 Initialize mail
 
 def create_mail(app):
-    import flask.ext.mail
-    mail = flask.ext.mail.Mail()
+    # Updated import from flask.ext.mail to flask_mail
+    import flask_mail
+    mail = flask_mail.Mail()
     mail.init_app(app)
     return mail
 
@@ -91,7 +95,9 @@ login_manager.anonymous_user = Anonymous
 
 @login_manager.user_loader
 def load_user(userid):
-    user = schema.user.User.query.get(userid)
+    # In SQLAlchemy 2.x, get() requires model class as positional argument and primary key as keyword argument
+    # Changed from .get(userid) to .get(schema.user.User, userid)
+    user = schema.user.User.query.get(schema.user.User, userid)
     if user:
         return CurrentUser(user)
     return None
