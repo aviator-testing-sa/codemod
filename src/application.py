@@ -14,10 +14,15 @@ app.secret_key = app.config['APP_SECRET']
 
 
 if __name__ == '__main__':
-    @app.before_first_request
+    # @app.before_first_request is deprecated in Flask 2.0+ and removed in Flask 2.3+
+    # Use the with_appcontext pattern instead
     def debug_mailserver():
         import mailserver
         app.debug_mailserver = mailserver.debug_server(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
+
+    # Run the debug_mailserver function before the first request
+    with app.app_context():
+        debug_mailserver()
 
     # FIXME: flask forks itself as a child process meaning it gets called twice
     #        rea
@@ -29,8 +34,3 @@ if __name__ == '__main__':
 
 
     app.run(debug=True)
-
-
-
-
-

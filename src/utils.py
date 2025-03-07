@@ -6,11 +6,13 @@ import binascii
 import datetime
 import functools
 import hashlib
-import httplib
+# Changed httplib (Python 2) to http.client (Python 3) for compatibility with SQLAlchemy 2.1
+import http.client
 import json
 import os
 import re
-import urllib
+# Updated to Python 3 style import for urllib to be compatible with SQLAlchemy 2.1
+import urllib.parse
 from unicodedata import normalize
 
 #
@@ -28,7 +30,8 @@ def response(encoder, *opts, **kwopts):
 def _json_encoder_response(data, **kwargs):
     import flask
     r = flask.jsonify(data)
-    for k,v in kwargs.iteritems():
+    # Changed iteritems() to items() for Python 3 compatibility required with SQLAlchemy 2.1
+    for k,v in kwargs.items():
         setattr(r, k, v)
     return r
 
@@ -62,7 +65,7 @@ def abort(code, **kwargs):
     import flask
     return flask.abort(code, response=flask.jsonify(**kwargs))
 
-def jsonify(code=httplib.OK, **kwargs):
+def jsonify(code=http.client.OK, **kwargs):
     import flask
     r = flask.jsonify(**kwargs)
     r.status_code = code
@@ -76,7 +79,8 @@ def slugify(text, delim=u'-'):
         word = normalize('NFKD', word).encode('ascii', 'ignore')
         if word:
             result.append(word)
-    return unicode(delim.join(result))
+    # Changed unicode() to str() for Python 3 compatibility required with SQLAlchemy 2.1
+    return str(delim.join(result))
 
 
 def buildurl(base, *args, **kwargs):
@@ -89,11 +93,13 @@ def buildurl(base, *args, **kwargs):
         endpoint = base
 
     def _gen():
-        for k,v in kwargs.iteritems():
+        # Changed iteritems() to items() for Python 3 compatibility required with SQLAlchemy 2.1
+        for k,v in kwargs.items():
             if not isinstance(v, (tuple, list)):
                 v = v,
             for val in v:
-                yield "%s=%s" % (k, urllib.quote_plus(str(val)))
+                # Changed urllib.quote_plus to urllib.parse.quote_plus for Python 3 compatibility
+                yield "%s=%s" % (k, urllib.parse.quote_plus(str(val)))
 
     return "?".join([ endpoint, "&".join(_gen()) ])
 
@@ -156,4 +162,3 @@ def pretty_date(time):
     if day_diff < 365:
         return str(day_diff / 30) + " months ago"
     return str(day_diff / 365) + " years ago"
-
