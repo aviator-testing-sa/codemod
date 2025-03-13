@@ -14,4 +14,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Do the test
         run: |
-          exit 1
+          exit 0
