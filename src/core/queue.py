@@ -440,9 +440,7 @@ def fetch_pr_with_repo(
 ) -> None:
     # Save unnecessary API calls by skipping for unuseful actions.
     if action and action not in VALID_ACTIONS:
-        return
-
-    logger.info("Fetching latest pull request data from GitHub")
+        returnlogger.info("Fetching latest pull request data from GitHub")
     if not repo.account.billing_active:
         logger.info("Repository does not belong to an active account, aborting fetch")
         return
@@ -630,7 +628,10 @@ def fetch_pr_from_status(
                     and pr.status == "pending"
                 ):
                     # add a 5 seconds delay to ensure that GH provides updated test results
-                    fetch_pr.with_countdown(5).delay(pr.number, repo.name)
+                    fetch_pr.apply_async(
+                        args=[pr.number, repo.name],
+                        countdown=5,
+                    )
                     return
 
                 # optimize to only process the top PRs.
@@ -645,8 +646,9 @@ def fetch_pr_from_status(
                         pr.number,
                     )
                     # add a 5 seconds delay to ensure that GH provides updated test results
-                    process_top_async.with_countdown(5).delay(
-                        repo.id, pr.target_branch_name
+                    process_top_async.apply_async(
+                        args=[repo.id, pr.target_branch_name],
+                        countdown=5,
                     )
                 return
         elif repo.parallel_mode:
@@ -673,8 +675,9 @@ def fetch_pr_from_status(
                     bot_pr.number,
                 )
                 # add a 5 seconds delay to ensure that GH provides updated test results
-                process_top_async.with_countdown(5).delay(
-                    repo.id, bot_pr.pull_request.target_branch_name
+                process_top_async.apply_async(
+                    args=[repo.id, bot_pr.pull_request.target_branch_name],
+                    countdown=5,
                 )
 
 
@@ -873,9 +876,7 @@ def _transition_pr_not_ready(
         and pr.status_reason == status_reason
     ):
         # Early exit if we're not actually changing anything
-        return
-
-    if new_status == "pending":
+        returnif new_status == "pending":
         pr.set_status("pending", status_code, status_reason)
         _remove_blocked_label(client, repo, pull)
         db.session.commit()
@@ -1296,9 +1297,7 @@ def _process_fetched_pull_for_state_transition(
             return False
 
     merge_operation = _ensure_pr_merge_operation_if_ready(repo, pr, pull)
-    logger.bind(merge_operation_id=merge_operation.id if merge_operation else None)
-
-    # Check custom validations before the PR is queued since we want to surface
+    logger.bind(merge_operation_id=merge_operation.id if merge_operation else None)# Check custom validations before the PR is queued since we want to surface
     # that information early.
     validation_issues = core.custom_validations.check_custom_validations(repo, pr)
     if validation_issues:
@@ -1733,9 +1732,7 @@ def ensure_bot_pull_status(
                 bot_pr.batch_pr_list[0].target_branch_name,
                 bot_pr=bot_pr,
             )
-        return
-
-    # If all PRs in the batch are already merged/closed, make sure to handle post merge.
+        return# If all PRs in the batch are already merged/closed, make sure to handle post merge.
     if bot_pr and all(pr.status in ("merged", "closed") for pr in bot_pr.batch_pr_list):
         logger.info(
             "Repo %d batch %s already merged/closed, closing bot pr %d now",
@@ -2007,7 +2004,7 @@ def _sync_pr_status_on_close_or_merge(
 def handle_dequeue_locking(repo: GithubRepo, pr: PullRequest) -> None:
     with locks.for_repo(repo):
         # refresh the PR as it might be stale
-        # https://docs.sqlalchemy.org/en/13/orm/session_state_management.html#when-to-expire-or-refresh
+        # https://docs.sqlalchemy.org/en/20/orm/session_state_management.html#when-to-expire-or-refresh
         db.session.refresh(pr)
         db.session.refresh(repo)
         logger.info("Repo %d PR %d dequeue detected", repo.id, pr.number)
@@ -2183,44 +2180,42 @@ def process_top_fifo_for_branch(repo: GithubRepo, branch_name: str) -> None:
 
     if not pr:
         logger.info("Repo %d nothing to process", repo.id)
-        return
+        return# For stacked PRs, we need to find the highest queued PR.
+# The other PRs will be closed with the merged-by-mq label.
+if stack_manager.is_in_stack(pr):
+    ready_stack = stack_manager.get_ready_stack_after_pr(pr)
+    pr = ready_stack[-1]
 
-    # For stacked PRs, we need to find the highest queued PR.
-    # The other PRs will be closed with the merged-by-mq label.
-    if stack_manager.is_in_stack(pr):
-        ready_stack = stack_manager.get_ready_stack_after_pr(pr)
-        pr = ready_stack[-1]
+if top_changed(repo.id, pr.number):
+    pilot_data = common.get_pilot_data(pr, "top_of_queue")
+    hooks.call_master_webhook.delay(
+        pr.id,
+        "top_of_queue",
+        pilot_data=pilot_data,
+        ci_map={},
+        note="",
+        status_code_int=pr.status_code.value,
+    )
+    pr.last_processed = time_util.now()
 
-    if top_changed(repo.id, pr.number):
-        pilot_data = common.get_pilot_data(pr, "top_of_queue")
-        hooks.call_master_webhook.delay(
-            pr.id,
-            "top_of_queue",
-            pilot_data=pilot_data,
-            ci_map={},
-            note="",
-            status_code_int=pr.status_code.value,
-        )
-        pr.last_processed = time_util.now()
+if can_skip_process_top(pr.id):
+    logger.info("Repo %d PR %d skipping process top", repo.id, pr.number)
+    return
 
-    if can_skip_process_top(pr.id):
-        logger.info("Repo %d PR %d skipping process top", repo.id, pr.number)
-        return
+access_token, client = common.get_client(repo)
+if not client:
+    return
 
-    access_token, client = common.get_client(repo)
-    if not client:
-        return
+try:
+    result_pr = review_pr_for_merge(access_token, repo, client, pr)
+except errors.GithubMergeabilityPendingException as e:
+    logger.info("Repo %d PR %d github mergeability pending", repo.id, pr.number)
+    result_pr = None
+if result_pr and result_pr.status in ["merged", "blocked", "closed"]:
+    # this PR process finished, process top again.
+    process_top_async.delay(repo.id, branch_name)
 
-    try:
-        result_pr = review_pr_for_merge(access_token, repo, client, pr)
-    except errors.GithubMergeabilityPendingException as e:
-        logger.info("Repo %d PR %d github mergeability pending", repo.id, pr.number)
-        result_pr = None
-    if result_pr and result_pr.status in ["merged", "blocked", "closed"]:
-        # this PR process finished, process top again.
-        process_top_async.delay(repo.id, branch_name)
-
-    update_gh_pr_status.delay(pr.id)
+update_gh_pr_status.delay(pr.id)
 
 
 def review_pr_for_merge(
@@ -2618,10 +2613,7 @@ def mark_as_blocked(
         "blocked",
         ci_map=ci_map,
         note=note or status_reason,
-    )
-
-
-def _check_for_reset_in_lock(repo: GithubRepo) -> bool:
+    )def _check_for_reset_in_lock(repo: GithubRepo) -> bool:
     """
     This job is only querying the DB state for checking if the queue
     should be reset. It only makes API calls if the queue is actually reset.
@@ -3066,9 +3058,7 @@ def has_exceeded_wait_time(
         )
         .where(BotPr.status == "queued", BotPr.is_bisected_batch.is_(False))
         .order_by(BotPr.created.desc()),
-    ).all()
-
-    min_remaining: datetime.timedelta | None = None
+    ).all()min_remaining: datetime.timedelta | None = None
     for base_branch in base_branches:
         last_bot_pr = next(
             (bp for bp in current_bot_prs if bp.target_branch_name == base_branch),
@@ -3101,7 +3091,7 @@ def validate_parallel_mode_pr(
     required_approvers: list[str],
 ) -> bool:
     # refresh the PR as it might be stale
-    # https://docs.sqlalchemy.org/en/13/orm/session_state_management.html#when-to-expire-or-refresh
+    # https://docs.sqlalchemy.org/en/20/orm/session_state_management.html#when-to-expire-or-refresh
     db.session.refresh(pr)
     if pr.status != "queued":
         logger.info(
@@ -3484,11 +3474,9 @@ def tag_new_batch(client: GithubClient, repo: GithubRepo, batch: Batch) -> None:
                         StatusCode.DRAFT_PRS_UNSUPPORTED,
                     )
                 return
-            raise
-
-    bot_pr: BotPr | None = BotPr.query.filter_by(
-        repo_id=repo.id, number=int(bot_pull.number)
-    ).first()
+            raisebot_pr: BotPr | None = db.session.execute(
+        db.select(BotPr).filter_by(repo_id=repo.id, number=int(bot_pull.number))
+    ).scalar_one_or_none()
     if not bot_pr:
         bot_pr = BotPr(
             number=int(bot_pull.number),
@@ -3910,10 +3898,7 @@ def create_bot_branch_default(
         )
         raise
     finally:
-        client.delete_ref(tmp_branch)
-
-
-def create_bot_branch_from_target_branch(
+        client.delete_ref(tmp_branch)def create_bot_branch_from_target_branch(
     client: GithubClient,
     repo: GithubRepo,
     batch: Batch,
@@ -3985,8 +3970,8 @@ def create_bot_branch_from_target_branch(
                 branch=tmp_branch,
             )
             # Delete this branch after 2 days.
-            delete_stale_branch.with_countdown(2 * 24 * 60 * 60).delay(
-                repo.id, tmp_branch
+            delete_stale_branch.delay(
+                repo.id, tmp_branch, countdown=2 * 24 * 60 * 60
             )
         raise e
     return new_branch
@@ -4335,6 +4320,19 @@ def _handle_batch_merge_conflict(
     That means we add previous_prs to the tmp_branch (which contains the target branch and first PR in batch).
     Therefore, if conflicting_pr comes from previous_prs, (aka conflicting_pr is not in the batch),
     then conflicting_pr conflicts with the first PR in the batch.
+    """def _handle_batch_merge_conflict(
+    client: GithubClient,
+    repo: GithubRepo,
+    batch: Batch,
+    previous_prs: list[PullRequest],
+    conflicting_pr: int = 0,
+) -> None:
+    """
+    Handle a merge conflict in a batch.
+
+    If conflicting_pr is 0, it means the conflict is with the base branch.
+    If conflicting_pr is in batch.pr_numbers, it means the conflict is with another PR in the batch.
+    If conflicting_pr is not in batch.pr_numbers, it means the conflict is with a PR outside the batch.
 
     Then we call `apply_prs_to_branch` for `batch.prs[1:]`.
     That means we add batch.prs to the tmp_branch.
@@ -4447,19 +4445,19 @@ def _should_retry_bot_pr_creation(batch: Batch) -> bool:
     Returns True if we can prove that the merge conflict was invalid. Return False
     if the merge conflict was genuine. We return False if this was previously reported
     as an invalid merge conflict, but we still could not create a draft PR for it.
-    """
-    for pull in batch.get_all_pulls():
-        if pull.mergeable_state == "dirty":
-            return False
+    """```python
+for pull in batch.get_all_pulls():
+    if pull.mergeable_state == "dirty":
+        return False
 
-    # To avoid cyclic loop, let's log if we hit this situation again and return True.
-    for pr in batch.prs:
-        if _has_merge_conflict_with_no_conflicting_pr(pr.id):
-            logger.error(
-                "Repo %d PR %d has an unverified merge conflict", pr.repo_id, pr.number
-            )
-            return False
-    return True
+# To avoid cyclic loop, let's log if we hit this situation again and return True.
+for pr in batch.prs:
+    if _has_merge_conflict_with_no_conflicting_pr(pr.id):
+        logger.error(
+            "Repo %d PR %d has an unverified merge conflict", pr.repo_id, pr.number
+        )
+        return False
+return True
 
 
 def _formatted_batch_pr_list(pr: PullRequest, batch_prs: list[PullRequest]) -> str:
@@ -4825,7 +4823,7 @@ def _check_top_pr_stuck(client: GithubClient, repo: GithubRepo, bot_pr: BotPr) -
     Determine the PR as not stuck if both `stuck_pr_timeout_mins` and `ci_timeout` are not set.
 
     :return bool: True if the PR is stuck, otherwise False.
-    """
+```"""
     pr: PullRequest = bot_pr.pull_request
     if _is_queue_paused(repo, pr.target_branch_name):
         return False
@@ -5263,8 +5261,7 @@ def _get_most_recent_bot_pr(pr: PullRequest) -> BotPr | None:
     """
     This method is different from # pr.latest_bot_pr because this does not take
     into account the `pr.queued_at`. Only used by `handle_emergency_merge` to go
-    around the scenario where we update the queued_at value.
-    """
+    around the scenario where we update the queued_at value."""
     if pr.status == "tagged":
         bot_pr: BotPr | None = (
             BotPr.query.filter(BotPr.batch_pr_list.any(PullRequest.id == pr.id))
@@ -5634,7 +5631,7 @@ def handle_failed_bot_pr(
     :param skip_reset_queue: If this is set to true, the bot PR will be closed and the database will
         be updated but the queue will not be reset.
     :param status_code: StatusCode should be provided if update_pr_status is True
-    """
+    """"""
     batch = Batch(client, bot_pr.batch_pr_list)
 
     db.session.refresh(repo)
@@ -6065,7 +6062,7 @@ def resync_bot_pr(
     :param previous_prs: The list of all PRs whose commit were included in the previous BotPR.
     :param previous_bot_pr: The previous BotPR, if any.
     :return: The name of the resynced branch, or None if the resync failed.
-    """
+""""""
     bot_pull = client.get_pull(bot_pr.number)
     slog = logger.bind(
         repo_id=repo.id,
@@ -6490,11 +6487,11 @@ def _set_merge_commit_sha_in_stack(
 ) -> None:
     # convert back to dictionary
     pr_to_merge_sha_map = {pr_number: sha for pr_number, sha in pr_to_merge_sha}
-    all_prs: list[PullRequest] = db.session.scalars(
+    all_prs: list[PullRequest] = db.session.execute(
         sa.select(PullRequest)
         .where(PullRequest.number.in_(pr_to_merge_sha_map.keys()))
         .where(PullRequest.repo_id == repo_id)
-    ).all()
+    ).scalars().all()
     for pr in all_prs:
         pr.merge_commit_sha = pr_to_merge_sha_map[pr.number]
     db.session.commit()
@@ -6511,69 +6508,1697 @@ def update_prs_post_merge(
 ) -> PullRequest:
     """
     Update pull requests after merging them on GitHub.
-
-    :param client: The GitHub client.
-    :param repo: The GitHub repo.
-    :param pr: The PR that was merged.
-    :param pull: The GitHub pull request object.
-    :param prs_to_update: The list of PRs to update.
-    :param optimistic_botpr: The BotPR that caused an optimistic merge (if any).
-        An optimistic merge is one where a subsequent BotPR succeeded and caused
-        MergeQueue to consider the original PR as successful (even if its BotPR
-        wasn't passing).
-    :return:
+"""def _check_top_pr_stuck(client: GithubClient, repo: GithubRepo, bot_pr: BotPr) -> bool:
     """
-    for pr_to_update in prs_to_update:
+    Check if the top PR is stuck.
+    Automatically dequeue the PR if it has been at the top for over `stuck_pr_timeout_mins + ci_timeout` (if defined),
+    and send a Slack alert.
+
+    Determine the PR as not stuck if both `stuck_pr_timeout_mins` and `ci_timeout` are not set.
+
+    :return bool: True if the PR is stuck, otherwise False.
+    """
+    pr: PullRequest = bot_pr.pull_request
+    if _is_queue_paused(repo, pr.target_branch_name):
+        return False
+
+    # Make sure "top" Activity is the most recent for this pr
+    most_recent_activity: Activity | None = (
+        Activity.query.filter(
+            Activity.repo_id == repo.id,
+            Activity.pull_request_id == pr.id,
+        )
+        .order_by(Activity.id.desc())
+        .first()
+    )
+    if not (most_recent_activity and most_recent_activity.name is ActivityType.TOP):
+        return False
+
+    time_pr_reached_top: datetime.datetime = _get_time_at_top(
+        repo, pr, most_recent_activity
+    )
+
+    min_at_top = (time_util.now() - time_pr_reached_top).total_seconds() / 60
+
+    # If no timeout is set, PR is not stuck.
+    if not repo.parallel_mode_config.stuck_pr_timeout_mins and not repo.ci_timeout_mins:
+        return False
+
+    # We only dequeue PRs if there's a configured timeout.
+    should_dequeue_pr = False
+    allowed_timeout = 120
+    if repo.parallel_mode_config.stuck_pr_timeout_mins and repo.ci_timeout_mins:
+        should_dequeue_pr = True
+        allowed_timeout = (
+            repo.parallel_mode_config.stuck_pr_timeout_mins + repo.ci_timeout_mins
+        )
+
+    if min_at_top < allowed_timeout:
+        return False
+
+    logger.info(
+        "Repo %d top PR %d exceeded timeout %d, at top for %d min",
+        repo.id,
+        pr.number,
+        allowed_timeout,
+        min_at_top,
+    )
+    # Send Slack alert
+    if (
+        repo.parallel_mode_config.stuck_pr_timeout_mins
+        and repo.ci_timeout_mins
+        and should_notify(repo.id, pr.number)
+        and app.config.get("SLACK_NOTIFY_PROD_ALERTS_WEBHOOK")
+    ):
+        internal_webhooks.slack_notify_stuck_top_pr(
+            repo=repo,
+            pr=bot_pr.pull_request,
+            bot_pr=bot_pr,
+            pr_time=int(min_at_top),
+            timeout=allowed_timeout,
+        )
+
+    if should_dequeue_pr:
+        # Dequeue PR before resetting the queue.
+        mark_as_blocked(
+            client,
+            repo,
+            pr,
+            client.get_pull(pr.number),
+            StatusCode.STUCK_TIMEDOUT,
+            ci_map={},
+        )
+        full_queue_reset(
+            repo, StatusCode.RESET_BY_TIMEOUT, pr.target_branch_name, bot_pr=bot_pr
+        )
+
+    return should_dequeue_pr
+
+
+def _get_time_at_top(
+    repo: GithubRepo, pr: PullRequest, top_activity: Activity
+) -> datetime.datetime:
+    # Make sure we check for both repo unpaused and base branch unpaused.
+    # Return the time associated with the unpaused or top activity (whichever is most recent).
+    repo_unpause_activity: Activity | None = (
+        Activity.query.filter(
+            Activity.repo_id == repo.id,
+            Activity.name == ActivityType.UNPAUSED,
+            Activity.base_branch.is_(None),
+            Activity.created > top_activity.created,
+        )
+        .order_by(Activity.id.desc())
+        .first()
+    )
+    branch_unpause_activities: list[Activity] = (
+        Activity.query.filter(
+            Activity.repo_id == repo.id,
+            Activity.name == ActivityType.UNPAUSED,
+            Activity.created > top_activity.created,
+        )
+        .order_by(Activity.id.desc())
+        .all()
+    )
+    branch_unpause_activities = [
+        activity
+        for activity in branch_unpause_activities
+        if activity.base_branch
+        and fnmatch.fnmatch(pr.target_branch_name, activity.base_branch)
+    ]
+
+    branch_unpause_activity: Activity | None = (
+        branch_unpause_activities[0] if branch_unpause_activities else None
+    )
+
+    final_activity: Activity = top_activity
+
+    if repo_unpause_activity:
+        final_activity = _most_recent_activity(final_activity, repo_unpause_activity)
+    if branch_unpause_activity:
+        final_activity = _most_recent_activity(final_activity, branch_unpause_activity)
+
+    return final_activity.created
+
+
+def _most_recent_activity(activity1: Activity, activity2: Activity) -> Activity:
+    return activity1 if activity1.created > activity2.created else activity2
+
+
+def _format_ci_list_markdown(ci_list: list[str]) -> str:
+    formatted = ""
+    for ci in ci_list[:5]:
+        formatted += f"\n- `{ci}`"
+    if len(ci_list) > 5:
+        formatted += f"\n- _{len(ci_list) - 5} checks omitted_"
+    return formatted
+
+
+def _format_pr_list_markdown(pr_list: list[PullRequest]) -> str:
+    formatted = ""
+    for pr in pr_list[:5]:
+        formatted += f"\n- {pr.url}"
+    if len(pr_list) > 5:
+        formatted += f"\n- _{len(pr_list) - 5} more PRs_"
+    return formatted
+
+
+def batch_fast_forward_merge(
+    client: GithubClient,
+    repo: GithubRepo,
+    batch: Batch,
+    bot_pull: pygithub.PullRequest,
+    bot_pr: BotPr,
+    ci_map: dict[str, str],
+    *,
+    optimistic_botpr: BotPr | None,
+) -> None:
+    if _is_queue_paused(repo, batch.get_first_pull().base.ref):
+        _comment_for_paused(batch.get_first_pr())
+        return
+    pr = batch.get_first_pr()
+    pull = batch.get_first_pull()
+    did_merge = merge_pr(
+        client,
+        repo,
+        pr,
+        pull,
+        parallel_mode=True,
+        bot_pull=bot_pull,
+        batch=batch,
+        optimistic_botpr=optimistic_botpr,
+    )
+    pr_ids = [pr.id for pr in batch.prs]
+    if did_merge:
+        for pr in batch.prs:
+            handle_post_merge(
+                client, repo, pr, batch.get_pull(pr.number), bot_pr, bot_pull
+            )
+        hooks.call_webhook_for_batch.delay(bot_pr.id, pr_ids, "batch_merged")
+        process_top_async.delay(repo.id, batch.target_branch_name)
+        tag_queued_prs_async.delay(repo.id)
+    elif pr.status == "blocked":
+        # this should not happen, bot_pr status will be inconsistent
+        logger.error(
+            "Repo %d PR %d failed to fast forward, bot_pr %d",
+            repo.id,
+            batch.get_first_pr().number,
+            bot_pr.number,
+        )
+        handle_failed_bot_pr(
+            client,
+            repo,
+            bot_pr,
+            False,
+            ci_map,
+        )
+        hooks.call_webhook_for_batch.delay(bot_pr.id, pr_ids, "batch_failed")
+        return
+    elif pr.status == "tagged":
+        # we should only retry merge when the PR is tagged. if the PR is queued, it will eventually get tagged again.
+        logger.error(
+            "Repo %d PR %d fast forward interrupted, scheduling retry",
+            repo.id,
+            batch.get_first_pr().number,
+        )
+        retry_merge.delay(batch.get_first_pr().id)
+    elif _is_queue_paused(repo, pull.base.ref):
+        logger.info("Repo %d PR %d queue is paused", repo.id, pr.number)
+        return
+    else:
+        logger.info(
+            "Repo %d PR %d failed to fast forward, status is %s",
+            repo.id,
+            pr.number,
+            pr.status,
+        )
+
+
+def batch_merge(
+    client: GithubClient,
+    repo: GithubRepo,
+    batch: Batch,
+    bot_pr: BotPr,
+    bot_pull: pygithub.PullRequest,
+    ci_map: dict[str, str],
+    *,
+    optimistic_botpr: BotPr | None,
+) -> None:
+    if _is_queue_paused(repo, batch.get_first_pull().base.ref):
+        _comment_for_paused(batch.get_first_pr())
+        return
+    pr_ids = [pr.id for pr in batch.prs]
+    needs_retry = False
+    for pr in batch.prs:
+        if pr.status in ("merged", "closed"):
+            continue
+        pull = batch.get_pull(pr.number)
+        did_merge = merge_pr(
+            client,
+            repo,
+            pr,
+            pull,
+            parallel_mode=True,
+            bot_pull=bot_pull,
+            batch=batch,
+            optimistic_botpr=optimistic_botpr,
+        )
+        if did_merge:
+            continue
+        elif pr.status == "blocked":
+            # this should not happen, bot_pr status will be inconsistent
+            logger.warning(
+                "Repo %d PR %d failed to merge (partially), bot_pr %d",
+                repo.id,
+                pr.number,
+                bot_pr.number,
+            )
+            handle_failed_bot_pr(
+                client,
+                repo,
+                bot_pr,
+                False,
+                ci_map,
+                failed_batch_pr=pr,
+            )
+            hooks.call_webhook_for_batch.delay(bot_pr.id, pr_ids, "batch_failed")
+            return
+        elif _is_queue_paused(repo, pull.base.ref):
+            logger.info("Repo %d PR %d queue is paused", repo.id, pr.number)
+            return
+        else:
+            logger.info(
+                "PR merge didn't finish, scheduling retry.",
+                repo_id=repo.id,
+                pr_number=pr.number,
+            )
+            retry_merge.delay(pr.id)
+            needs_retry = True
+
+    if not needs_retry:
+        # Only close bot_pr when all PRs are merged. In case of retry, the bot_pr is
+        # closed after retry is complete.
+        handle_post_merge(client, repo, batch.prs[0], None, bot_pr, bot_pull)
+        hooks.call_webhook_for_batch.delay(bot_pr.id, pr_ids, "batch_merged")
+    process_top_async.delay(repo.id, batch.target_branch_name)
+    tag_queued_prs_async.delay(repo.id)
+
+
+def set_emergency_merge_for_pr(pr: PullRequest) -> None:
+    repo: GithubRepo = pr.repo
+    if not pr.emergency_merge:
+        pr.set_emergency_merge(True)
+        db.session.commit()
+    if _is_queue_paused(repo, pr.target_branch_name):
+        _, client = common.get_client(repo)
+        client.create_issue_comment(
+            pr.number,
+            "This PR cannot be merged right now because the queue is paused. "
+            "It will be merged immediately once the queue is resumed.",
+        )
+        return
+    if pr.status not in ("merged", "closed"):
+        handle_emergency_merge.delay(pr.id)
+    logger.info(
+        "Triggered emergency merge", repo_id=repo.id, pr_id=pr.id, pr_number=pr.number
+    )
+
+
+@celery.task(
+    autoretry_for=(Exception,),
+    retry_backoff=10,
+    retry_kwargs={"max_retries": 5},
+    retry_jitter=True,
+)
+def handle_emergency_merge(pr_id: int) -> None:
+    """
+    This logic is similar to batch_merge, but during break-glass
+    we need special handling to ensure that the bot PR is closed if it exists.
+    We will also reset the queue
+    """
+    pr = PullRequest.get_by_id_x(pr_id)
+    pr.bind_contextvars()
+    repo = pr.repo
+    repo.bind_contextvars()
+    if not pr.emergency_merge:
+        logger.error(
+            "Invalid emergency merge (pull request is not marked for emergency merge)",
+            repo_id=repo.id,
+            pr_id=pr.id,
+            pr_number=pr.number,
+        )
+        return
+    _handle_emergency_merge_with_lock(pr)
+
+
+def _handle_emergency_merge_with_lock(pr: PullRequest) -> None:
+    repo = pr.repo
+    with locks.for_repo(repo):
+        _, client = common.get_client(repo)
+        pull = client.get_pull(pr.number)
+        # refresh the PR as it might be stale
+        # https://docs.sqlalchemy.org/en/13/orm/session_state_management.html#when-to-expire-or-refresh
+        db.session.refresh(pr)
+        bot_pr: BotPr | None = _get_most_recent_bot_pr(pr)
+        pr.queued_at = time_util.now()
+        db.session.commit()
+        did_merge = merge_pr(
+            client,
+            repo,
+            pr,
+            pull,
+            repo.parallel_mode,
+            optimistic_botpr=None,
+        )
+        logger.info(
+            "Attempted emergency merge",
+            repo_id=repo.id,
+            pr_id=pr.id,
+            pr_number=pr.number,
+            did_merge=did_merge,
+        )
+        if did_merge:
+            # The BotPR might not be needed anymore. Close it if needed.
+            if bot_pr:
+                bot_pr.bind_contextvars()
+                if all(p.status == "merged" for p in bot_pr.batch_pr_list):
+                    logger.info(
+                        "Closing a BotPR since all of its PRs are merged/closed",
+                        batch_pr_numbers=[p.number for p in bot_pr.batch_pr_list],
+                    )
+                    bot_pull = client.get_pull(bot_pr.number)
+                    # mypy complains that latest_bot_pr may be null, but that's an
+                    # application invariant if we're here, so just raise an assertion.
+                    assert bot_pr, (
+                        f"bot_pr should exist for repo {repo.id} PR {pr.number}"
+                    )
+                    handle_post_merge(
+                        client,
+                        repo,
+                        pr,
+                        client.get_pull(pr.number),
+                        bot_pr,
+                        bot_pull,
+                    )
+                else:
+                    logger.info(
+                        "Keeping a BotPR since some of its PRs are not merged/closed",
+                        batch_pr_numbers=[pr.number for pr in bot_pr.batch_pr_list],
+                    )
+
+            # Not resetting here to avoid a lot of time wasted by the queue. This may
+            # cause some issues if we try to construct the PR with the latest master and
+            # one of the pending draft PRs. Today this only happens during partial resets,
+            # so the chance of that happening is relatively low. We should also just redo
+            # our logic on generating draft PRs, but that's a bigger change.
+            returnif pr.status == "blocked":
+            # this should not happen, bot_pr status will be inconsistent
+            logger.warning(
+                "Break glass pull request failed to merge",
+                repo_id=repo.id,
+                pr_id=pr.id,
+                pr_number=pr.number,
+            )
+            bot_pr = pr.latest_bot_pr
+            if bot_pr:
+                handle_failed_bot_pr(
+                    client,
+                    repo,
+                    bot_pr,
+                    False,
+                    ci_map={},
+                    failed_batch_pr=pr,
+                )
+                full_queue_reset(
+                    repo,
+                    pr.status_code,
+                    pr.target_branch_name,
+                )
+                return
+        if _is_queue_paused(repo, pull.base.ref):
+            logger.info(
+                "Queue is paused", repo_id=repo.id, pr_number=pr.number, pr_id=pr.id
+            )
+            return
+
+        fetch_pr.delay(pr.number, repo.name)
+
+        # if pr is still queued, we should raise exception so we can attempt again.
+        raise Exception(
+            "PR merge didn't finish, scheduling retry. Repo %d PR %d"
+            % (repo.id, pr.number)
+        )
+
+
+def _get_most_recent_bot_pr(pr: PullRequest) -> BotPr | None:
+    """
+    This method is different from # pr.latest_bot_pr because this does not take
+    into account the `pr.queued_at`. Only used by `handle_emergency_merge` to go
+    around the scenario where we update the queued_at value.
+    """
+    if pr.status == "tagged":
+        bot_pr: BotPr | None = (
+            BotPr.query.filter(BotPr.batch_pr_list.any(PullRequest.id == pr.id))
+            .order_by(BotPr.id.desc())
+            .first()
+        )
+        return bot_pr
+    return None
+
+
+@celery.task(
+    autoretry_for=(Exception,),
+    retry_backoff=10,
+    retry_kwargs={"max_retries": 5},
+    retry_jitter=True,
+)
+def retry_merge(pr_id: int) -> None:
+    pr: PullRequest | None = PullRequest.get_by_id_x(pr_id)
+    assert pr, f"PR {pr_id} not found"
+    repo = pr.repo
+    with locks.for_repo(repo):
+        # refresh the PR as it might be stale
+        # https://docs.sqlalchemy.org/en/13/orm/session_state_management.html#when-to-expire-or-refresh
+        db.session.refresh(pr)
+        bot_pr = pr.latest_bot_pr
+        if not bot_pr:
+            logger.info(
+                "Repo %d PR %d retry_merge called but has no latest BotPR",
+                repo.id,
+                pr.number,
+            )
+            return
+        if pr.status in ("merged", "closed"):
+            if bot_pr.status != "closed":
+                bot_pr.set_status("closed", StatusCode.FAILED_UNKNOWN)
+                db.session.commit()
+            close_pulls(repo.id, [bot_pr.number])
+
+            logger.info(
+                "Repo %d PR %d retry_merge called but PR already merged",
+                repo.id,
+                pr.number,
+            )
+            return
+
+        if pr.status not in ("queued", "tagged"):
+            logger.info(
+                "Repo %d PR %d retry_merge called (BotPR %d) but PR not ready (status %s)",
+                repo.id,
+                pr.number,
+                bot_pr.number,
+                pr.status,
+            )
+            return
+
+        access_token, client = common.get_client(repo)
+        pull = client.get_pull(pr.number)
+        bot_pull = client.get_pull(bot_pr.number)
+
+        if bot_pull.merged:
+            logger.info(
+                "Repo %d PR %d retry_merge called (BotPR %d) but BotPR already merged (ff)",
+                repo.id,
+                pr.number,
+                bot_pr.number,
+            )
+            return
+
+        _did_merge = merge_pr(
+            client,
+            repo,
+            pr,
+            pull,
+            bot_pull=bot_pull,
+            parallel_mode=True,
+            # TODO: do we need to provide this?
+            optimistic_botpr=None,
+        )
+
+        # Tell mypy that the pr might have changed.
+        # Without this it complains because we checked for `pr.status == "merged"
+        # above and are re-checking it below.
+        pr = pr
+
+        if pr.status == "blocked":
+            handle_failed_bot_pr(
+                client,
+                repo,
+                bot_pr,
+                False,
+                ci_map={},
+                failed_batch_pr=pr,
+            )
+            pr_ids = [p.id for p in bot_pr.batch_pr_list]
+            hooks.call_webhook_for_batch.delay(bot_pr.id, pr_ids, "batch_failed")
+        if pr.status != "merged":
+            raise errors.MergeFailed(
+                "Failed to merge PR %d repo %d" % (pr.number, repo.id)
+            )
+        logger.info("Repo %d PR %d retry_merge success", repo.id, pr.number)
+
+        # Ensure all merged
+        for p in bot_pr.batch_pr_list:
+            if p.status != "merged":
+                logger.info(
+                    "Retry merge: batch not entirely merged yet",
+                    repo_id=repo.id,
+                    pr_number=pr.number,
+                    bot_pr=bot_pr.number,
+                    pending_pr=p.number,
+                )
+                return
+
+        handle_post_merge(
+            client, repo, pr, pull, bot_pr, client.get_pull(bot_pr.number)
+        )
+        pr_ids = [p.id for p in bot_pr.batch_pr_list]
+        hooks.call_webhook_for_batch(bot_pr.id, pr_ids, "batch_merged")
+
+
+@dataclasses.dataclass
+class CheckTopBotPRDecision:
+    #: The result of the check.
+    result: checks.TestResult
+    #: A mapping of CI check name to URL.
+    ci_map: dict[str, str]
+    #: The BotPR that caused the optimistic check to succeed.
+    #: This is set if and only if the overall result is "success" AND the target
+    #: BotPR was considered successful because of a subsequent BotPR's success.
+    #: If set, this is always a different BotPR than the `botpr` field.
+    optimistic_botpr: BotPr | None
+
+
+def parallel_mode_check_top_botpr(
+    client: GithubClient,
+    repo: GithubRepo,
+    target_botpr: BotPr,
+    target_bot_pull: pygithub.PullRequest,
+    subsequent_botprs: list[BotPr],
+) -> CheckTopBotPRDecision:
+    """
+    Determine if we should consider the target BotPR as success.
+
+    For repositories configured with optimistic validation, we will check all
+    subsequent BotPRs to see if any of them are passing. If so, we will consider
+    the target BotPR as passing as well.
+    """
+    target_test_summary = checks.fetch_latest_test_statuses(
+        client,
+        repo,
+        target_bot_pull,
+        # If we're re-using the original PR (not creating a new BotPR), we use
+        # the non-BotPR set of checks. If this is not desirable (the customer
+        # wants to ensure that all BotPR checks are validated), they can disable
+        # the `skip_draft_when_up_to_date` setting.
+        # This only matters at all if the repository has configured the
+        # `parallel_mode.override_required_checks` setting.
+        botpr=target_botpr.pull_request.number != target_botpr.number,
+    )
+    custom_checks.update_test_statuses_from_summary(target_test_summary, target_botpr)
+
+    should_perform_optimistic_check = (
+        # Only perform the optimistic check if repositories have explicitly
+        # opted-in to it.
+        repo.parallel_mode_config.use_optimistic_validation
+        # We don't check subsequent BotPRs if the target BotPR is a "skip when
+        # up to date" BotPR (since if it's failing, it'll seem like MergeQueue
+        # merged a failing PR into trunk).
+        and target_botpr.pull_request.number != target_botpr.number
+        # If the target BotPR is already passing, we don't need to check
+        # subsequent BotPRs.
+        and target_test_summary.result != "success"
+    )
+    if not should_perform_optimistic_check:
+        return CheckTopBotPRDecision(
+            target_test_summary.result,
+            target_test_summary.check_urls,
+            optimistic_botpr=None,
+        )
+
+    # To avoid excessive API calls, only read 3 levels down, or up to the failure depth.
+    depth = max(3, repo.optimistic_validation_failure_depth)
+
+    # Check if any of the subsequent BotPRs is still pending.
+    # If any of them are passing, we assume that the target BotPR will also pass
+    # (and/or just had a flaky test).
+    has_pending_botpr: bool = False
+    failure_count = 1 if target_test_summary.result == "failure" else 0
+    for botpr in subsequent_botprs[:depth]:
+        bot_pull = client.get_pull(botpr.number)
+        if bot_pull.head.sha != botpr.head_commit_sha:
+            # MER-2614: We have noticed that GH bot_pull returns a stale SHA sometimes.
+            # In these scenarios, ideally we want to validate the SHA we have captured
+            # in our DB vs what GH tells us. This requires a bit more surgery as we go by
+            # pull object rather than SHA to fetch and validate statuses.
+            # Logging this as error first to see how often this happens.
+            logger.error(
+                "Found BotPR head commit mismatch",
+                repo_id=repo.id,
+                botpr_number=botpr.number,
+                expected_commit=botpr.head_commit_sha,
+                actual_commit=bot_pull.head.sha,
+            )
+        test_summary = checks.fetch_latest_test_statuses(
+            client,
+            repo,
+            bot_pull,
+            botpr=True,
+        )
+        custom_checks.update_test_statuses_from_summary(test_summary, botpr)
+        if test_summary.result == "pending":
+            has_pending_botpr = True
+        for pr in botpr.batch_pr_list:
+            update_gh_pr_status.delay(pr.id)
+        if test_summary.result == "failure":
+            failure_count += 1
+        logger.info(
+            "Checking BotPR for optimistic check",
+            repo_id=repo.id,
+            target_botpr_number=target_bot_pull.number,
+            current_botpr_number=botpr.number,
+            current_botpr_result=test_summary.result,
+        )
+        if test_summary.result == "success":
+            logger.info(
+                "BotPR is success using optimistic check",
+                repo_id=repo.id,
+                target_botpr_number=target_botpr.number,
+                current_botpr_number=botpr.number,
+            )
+            # TODO[travis]: We should probably move this comment posting closer
+            #   to where we actually do the merging.
+            comments.add_optimistic_comment.delay(
+                repo.id, target_bot_pull.number, botpr.number
+            )
+            return CheckTopBotPRDecision(
+                "success",
+                target_test_summary.check_urls,
+                optimistic_botpr=botpr,
+            )
+
+    # If the target BotPR is considered a failure, but we haven't yet hit the
+    # configured failure depth, consider this pull request as pending.
+    if (
+        target_test_summary.result == "failure"
+        and failure_count < repo.optimistic_validation_failure_depth
+        # We also require at least some BotPR to be pending. If all of them are failure (it
+        # can't be success here since we return early above in that case), then
+        # there's no real way for the optimistic check to succeed. It makes more
+        # sense to just fail now in that case.
+        and has_pending_botpr
+    ):
+        return CheckTopBotPRDecision(
+            "pending",
+            target_test_summary.check_urls,
+            optimistic_botpr=None,
+        )
+
+    # The pull request is either pending or failure, and none of the subsequent
+    # BotPRs were passing.
+    return CheckTopBotPRDecision(
+        target_test_summary.result,
+        target_test_summary.check_urls,
+        optimistic_botpr=None,
+    )
+
+
+@dataclasses.dataclass
+class MergeabilityDecision:
+    mergeable: bool
+    ci_map: dict[str, str]
+    # A human readable description of why this decision was made
+    # (only if mergeable is False).
+    reason: str | None
+
+
+def check_mergeability_for_queue(
+    client: GithubClient,
+    repo: GithubRepo,
+    pull: pygithub.PullRequest,
+    pr: PullRequest,
+    force_validate: bool = False,
+) -> MergeabilityDecision:
+    """
+    Check whether or not the PR passes the configured repo mergeability checks.
+
+    This is mostly useful for parallel mode where a repository can have separate
+    checks configured for original and draft PRs, and we wish to wait for the
+    original PR to pass mergeability checks before creating a draft PR.
+    """
+    skip_validation = pr.merge_operations and pr.merge_operations.skip_validation
+    if skip_validation:
+        logger.info(
+            "Skip CI PR found while checking mergeability to queue",
+            pr_number=pr.number,
+            repo_id=repo.id,
+        )
+    details = checks.fetch_latest_test_statuses(
+        client,
+        repo,
+        pull,
+        botpr=False,
+    )
+    update_gh_pr_status.delay(pr.id)
+
+    # In case of skip_validation, we will still fetch the status, so we can update in the PR status
+    # but always set the final status to success regardless of the actual result.
+    status = "success" if skip_validation else details.result
+    ci_map = details.check_urls
+    reason = None
+    if repo.require_all_checks_pass and not ci_map and not skip_validation:
+        reason = "The HEAD commit of this pull request has no associated CI checks."
+
+    if pull.mergeable is False or pull.mergeable_state == "dirty":
+        logger.info(
+            "Repo %d PR %d is not queueable (mergeable=%s, mergeable_state=%s)",
+            repo.id,
+            pr.number,
+            pull.mergeable,
+            pull.mergeable_state,
+        )
+        return MergeabilityDecision(mergeable=False, ci_map=ci_map, reason=reason)
+
+    if (
+        pull.mergeable is None or pull.mergeable_state == "unknown"
+    ) and status == "success":
+        # GitHub would sometimes not tell us whether the PR is mergeable (no merge conflict),
+        # so we force validate it here by creating a merge commit if the CI has already passed.
+        if not force_validate:
+            raise errors.GithubMergeabilityPendingException(
+                "Unknown Github mergeability for repo %d PR %d" % (repo.id, pr.number)
+            )
+        if not _verify_mergeability(client, repo, pull):
+            return MergeabilityDecision(mergeable=False, ci_map=ci_map, reason=reason)
+
+    logger.info(
+        "Mergeability status for queue",
+        repo_id=repo.id,
+        pr_number=pr.number,
+        status=status,
+        ci_map=list(ci_map.keys()),
+        sha=pull.head.sha,
+    )
+    return MergeabilityDecision(
+        mergeable=(status == "success"), ci_map=ci_map, reason=reason
+    )
+
+
+def handle_failed_bot_pr(
+    client: GithubClient,
+    repo: GithubRepo,
+    bot_pr: BotPr,
+    update_pr_status: bool,
+    ci_map: dict[str, str],
+    failed_batch_pr: PullRequest | None = None,
+    skip_reset_queue: bool = False,
+    status_code: StatusCode | None = None,
+) -> None:
+    """
+    This method will close the BotPR, and block failed_batch_pr if it exists (see param).
+    The remaining PRs will be requeued with bisection.
+    The queue is then reset by updating all subsequent BotPrs.
+
+    :param failed_batch_pr: If this PR value is provided, we can assume that this PR caused the batch to fail.
+        That means failed_batch_pr should be blocked and all other PRs in the batch should be requeued.
+        If none, we assume that the BotPr failed, so all PRs in the batch should be requeued with bisection.
+    :param skip_reset_queue: If this is set to true, the bot PR will be closed and the database will
+        be updated but the queue will not be reset.
+    :param status_code: StatusCode should be provided if update_pr_status is True
+    """
+    batch = Batch(client, bot_pr.batch_pr_list)
+
+    db.session.refresh(repo)
+    if not repo.parallel_mode:
+        logger.info(
+            "Not re-syncing Repo %d PR %d BotPR %d (repo is no longer in parallel mode)",
+            repo.id,
+            bot_pr.pull_request.number,
+            bot_pr.number,
+        )
+        return
+
+    if all(pr.status == "merged" and pr.emergency_merge for pr in batch.prs):
+        # Figma uses emergency merge for the queued PRs. When this happens, the
+        # emergency merge task closes the BotPR in GitHub, and later in another task
+        # we detect the BotPR test failure (the failure is caused by the PR closure).
+        #
+        # Since emergency merge shouldn't cause disruption, we will just skip processing
+        # this BotPR.
+        logger.info(
+            "All PRs in a batch are emergency-merged. Ignore this BotPR failure."
+        )
+        returnprs_to_requeue = []
+    failed_prs = []
+    if failed_batch_pr:
+        failed_prs = [failed_batch_pr]
+        prs_to_requeue = [
+            pr
+            for pr in batch.prs
+            if pr.number != failed_batch_pr.number and pr.status == "tagged"
+        ]
+    else:
+        if len(bot_pr.batch_pr_list) == 1:
+            failed_prs = bot_pr.batch_pr_list
+        else:
+            # we assume the BotPr failed, so requeue all PRs.
+            # these PRs will eventually be rebatched with bisection.
+            prs_to_requeue = bot_pr.batch_pr_list
+
+    for failed_pr in failed_prs:
+        pull = batch.get_pull(failed_pr.number)
+        if not pull.merged:
+            client.add_label(pull, repo.blocked_label)
+            if update_pr_status:
+                if not status_code:
+                    raise Exception(
+                        "status_code must be provided if update_pr_status is True"
+                    )
+                common.set_pr_blocked(failed_pr, status_code)
+
+    # Automatically requeue all the non-problematic PRs in the batch
+    bisection.requeue_prs(prs_to_requeue, repo, failed_batch_pr, bot_pr)
+    bot_pr.set_status(
+        "closed",
+        failed_batch_pr.status_code if failed_batch_pr else StatusCode.FAILED_TESTS,
+    )
+    db.session.commit()
+
+    _removed_from_batch(bot_pr.batch_pr_list)
+    for p in prs_to_requeue:
+        update_gh_pr_status.delay(p.id)
+
+    # MER-2104: Close this PR after updating the DB to avoid any race conditions
+    # with inconsistent state between Github and DB.
+    if not batch.did_optimistically_reuse_original_pr(bot_pr):
+        close_reason = None
+        if failed_batch_pr:
+            close_reason = (
+                f"Batch failed due to PR #{failed_batch_pr.number}, "
+                + f"reason: {failed_batch_pr.status_code.message()}"
+            )
+        close_pulls.delay(repo.id, [bot_pr.number], close_reason=close_reason)
+
+    failed_pr_numbers = [pr.number for pr in failed_prs]
+    requeued_pr_numbers = [pr.number for pr in prs_to_requeue]
+    if failed_pr_numbers:
+        logger.info(
+            "The following PR failed in the batch",
+            repo_id=repo.id,
+            failed_prs=failed_pr_numbers,
+            status_code=failed_prs[0].status_code,
+        )
+    if requeued_pr_numbers:
+        logger.info("Repo %d PR %s have been requeued", repo.id, requeued_pr_numbers)
+    for pr in failed_prs:
+        if pr.status not in ("merged", "closed"):
+            send_pr_update_to_channel.delay(pr.id)
+            requeue_or_comment.delay(pr.id, ci_map)
+
+    # Ignore the reset if requested explicitly or if we are using parallel bisection mode.
+    if skip_reset_queue or bisection.is_parallel_bisection_batch(repo, bot_pr):
+        logger.info(
+            "Queue reset skipped",
+            repo_id=repo.id,
+            bot_pr_number=bot_pr.number,
+            use_parallel_bisection=repo.parallel_mode_config.use_parallel_bisection,
+        )
+        return
+
+    # now we need to resync all existing bot-PRs
+    if repo.parallel_mode_config.use_affected_targets:
+        batch_pr_id_list = [p.id for p in bot_pr.batch_pr_list]
+        bot_prs = target_manager.get_dependent_bot_prs(repo, batch_pr_id_list)
+
+        # Since both failed and requeued PRs are pushed to the end of the queue,
+        # we will remove the associated dependencies.
+        # The requeued PRs will then get the dependencies recalculated when those
+        # are tagged in tag_new_batch.
+        prs_to_remove_deps = failed_prs + bot_pr.batch_pr_list
+        target_manager.refresh_dependency_graph_on_reset(repo, prs_to_remove_deps)
+    else:
+        # Find all BotPRs after the failed one and resync them.
+        stmt = (
+            select(BotPr)
+            .filter_by(status="queued", repo_id=repo.id)
+            .join(PullRequest, BotPr.pull_request_id == PullRequest.id)
+            .filter(PullRequest.target_branch_name == batch.target_branch_name)
+            .filter(BotPr.id > bot_pr.id)
+            .order_by(BotPr.id.asc())
+        )
+        bot_prs = db.session.execute(stmt).scalars().all()
+
+    stmt = (
+        select(BotPr)
+        .filter_by(status="queued", repo_id=repo.id)
+        .join(PullRequest, BotPr.pull_request_id == PullRequest.id)
+        .filter(PullRequest.target_branch_name == batch.target_branch_name)
+        .filter(BotPr.id < bot_pr.id)
+        .order_by(BotPr.id.asc())
+    )
+    previous_bot_prs = db.session.execute(stmt).scalars().all()
+
+    # Exclude bisected
+    if repo.parallel_mode_config.use_parallel_bisection:
+        bot_prs = [bp for bp in bot_prs if not bp.is_bisected_batch]
+        previous_bot_prs = [bp for bp in previous_bot_prs if not bp.is_bisected_batch]
+
+    sync_branch = (
+        previous_bot_prs[-1].branch_name
+        if previous_bot_prs
+        else batch.target_branch_name
+    )
+    previous_bot_pr = previous_bot_prs[-1] if previous_bot_prs else None
+    previous_prs = []
+    for pbr in previous_bot_prs:
+        previous_prs.extend(pbr.batch_pr_list)
+
+    # NOTE: requeued_pr_numbers are PRs that is in the failed batch. We need
+    # to add the PRs that are in other batches.
+    resync_pr_count = len(prs_to_requeue)
+    closed_bot_pr_count = 0
+    for bot_pr_for_resync in bot_prs:
+        if (
+            bot_pr_for_resync.pull_request.target_branch_name
+            == batch.target_branch_name
+        ):
+            closed_bot_pr_count += 1
+            resync_pr_count += len(bot_pr_for_resync.batch_pr_list)
+            new_sync_branch = resync_bot_pr(
+                client,
+                repo,
+                bot_pr_for_resync,
+                previous_branch=sync_branch,
+                previous_prs=previous_prs,
+                previous_bot_pr=previous_bot_pr,
+            )
+            # Update the previous PRs list if resync was successful.
+            if new_sync_branch:
+                assert bot_pr_for_resync.head_commit_sha is not None, "Missing head SHA"
+                activity.create_activity(
+                    repo_id=repo.id,
+                    pr_id=bot_pr_for_resync.pull_request_id,
+                    activity_type=ActivityType.RESYNC,
+                    status_code=StatusCode.RESET_BY_FAILURE,
+                    payload=ActivityResyncPayload(
+                        triggering_bot_pr_id=bot_pr.id,
+                        new_bot_pr_head_commit_oid=bot_pr_for_resync.head_commit_sha,
+                    ),
+                )
+                previous_prs.extend(bot_pr_for_resync.batch_pr_list)
+                sync_branch = new_sync_branch
+                previous_bot_pr = bot_pr_for_resync
+
+    pr_for_reset_event: PullRequest | None = (
+        batch.get_first_pr() if len(batch.prs) == 1 else None
+    )
+    reset_code = StatusCode.get_reset_reason(bot_pr.status_code)
+    _record_reset_event(
+        repo.id,
+        reset_code,
+        pr_for_reset_event,
+        reset_count=resync_pr_count,
+        closed_bot_pr_count=closed_bot_pr_count,
+        ci_map=ci_map,
+        bot_pr=bot_pr,
+    )
+    logger.info("Repo %d resync complete for %d PRs", repo.id, len(bot_prs))
+    tag_queued_prs_async.delay(repo.id)
+
+
+def _removed_from_batch(pr_list: list[PullRequest]) -> None:
+    for pr in pr_list:
+        pilot_data = common.get_pilot_data(pr, "removed_from_batch")
+        hooks.call_master_webhook.delay(
+            pr.id, "removed_from_batch", pilot_data=pilot_data, ci_map={}, note=""
+        )
+
+
+@celery.task
+def requeue_or_comment(pr_id: int, ci_map: dict[str, str]) -> None:
+    """
+    If the PR can be re-queued, requeue it and skip comments. We only check
+    for requeuing if it's enabled and one of the CI has failed.
+    """
+    pr = PullRequest.get_by_id_x(pr_id)
+    repo = pr.repo
+    # We always want to check for requeue attempts when a PR is blocked because of a new commit added.
+    # The CI list is irrelevant since there is likely no failing CI (the new commit should have triggered a CI rerun).
+    if (
+        repo.parallel_mode
+        and repo.parallel_mode_config.max_requeue_attempts
+        and (ci_map or pr.status_code == StatusCode.COMMIT_ADDED)
+    ):
+        attempts = get_requeue_attempts(repo.id, pr.id)
+        if attempts > repo.parallel_mode_config.max_requeue_attempts:
+            comment_blocked_with_ci(pr, ci_map)
+            return
+
+        _, client = common.get_client(repo)
+        pull = client.get_pull(pr.number)
+        if not _requeue_pr_if_ci_updated(client, repo, pull, pr):
+            comment_blocked_with_ci(pr, ci_map)
+            return
+
+        fetch_pr.delay(pr.number, repo.name)
+        return
+
+    comment_blocked_with_ci(pr, ci_map)
+
+
+def comment_blocked_with_ci(pr: PullRequest, ci_map: dict[str, str]) -> None:
+    comments.post_pull_comment.delay(pr.id, "blocked", ci_map=ci_map)
+    pilot_data = common.get_pilot_data(pr, "blocked")
+    hooks.call_master_webhook.delay(
+        pr.id,
+        "blocked",
+        pilot_data=pilot_data,
+        ci_map={},
+        note="",
+        status_code_int=pr.status_code.value,
+    )
+
+
+def handle_post_merge(
+    client: GithubClient,
+    repo: GithubRepo,
+    pr: PullRequest,
+    pull: pygithub.PullRequest | None,
+    bot_pr: BotPr,
+    bot_pull: pygithub.PullRequest,
+    retry: bool = True,
+) -> None:
+    """
+    TODO:
+        Our post-merge actions are split across a few different places (namely
+        update_prs_post_merge which is called by merge_pr as well as this
+        function which is called by batch_merge, batch_fast_forward_merge,
+        and retry_merge (all three of which call merge_pr internally).
+    """
+    logger.info("Repo %d PR %d merged", repo.id, pr.number)
+    if bot_pr.number != pr.number:
+        try:
+            if _should_merge_draft_pr(pr):
+                # In case of fast forwarding, the original PR is not closed,
+                # so we add a label identifying it as merged, and close manually.
+                # In this case, since we fast forward the bot_pull, that is reported
+                # as merged and we only need to delete the branch reference there.
+                if not pull:
+                    raise Exception(
+                        f"pull object cannot be empty when merging a draft PR {pr.number} repo {repo.id}"
+                    )
+                client.add_label(pull, MERGED_BY_MQ_LABEL)
+                client.close_pull(pull)
+                delete_branch_if_applicable(client, repo, pull)
+                comments.post_pull_comment.delay(
+                    pr.id, "merged", note=str(bot_pr.number)
+                )
+            else:
+                if bot_pull.state != "closed":
+                    client.close_pull(bot_pull)
+            client.delete_ref(bot_pull.head.ref)
+        except Exception as e:
+            logger.warning(
+                "Failed to handle post merge",
+                repo_id=repo.id,
+                pr_number=pr.number,
+                retry=retry,
+                exc_info=e,
+            )
+            if retry:
+                handle_post_merge(client, repo, pr, pull, bot_pr, bot_pull, retry=False)
+            else:
+                logger.error(
+                    "Failed to handle post merge",
+                    repo_id=repo.id,
+                    pr_number=pr.number,
+                    exc_info=e,
+                )
+
+    if bot_pr.status != "closed":
+        bot_pr.set_status("closed", StatusCode.MERGED_BY_MQ)
+        db.session.commit()
+    target_manager.remove_dependencies(repo, pr)
+
+
+def _should_merge_draft_pr(pr: PullRequest) -> bool:
+    return (
+        bool(pr.repo.parallel_mode_config.use_fast_forwarding)
+        and pr.repo.parallel_mode
+        and not pr.emergency_merge
+    )
+
+
+def mark_ancestor_prs_merged_by_bot(client: GithubClient, pr: PullRequest) -> None:
+    """
+    Mark every ancestor PR as merged by the Aviator bot.
+    """
+    ancestor_prs = stack_manager.get_all_stack_ancestors(pr)
+    repo = pr.repo
+    logger.info(
+        "Repo %d PR %d marking stack ancestors as merged: %s",
+        repo.id,
+        pr.number,
+        ancestor_prs,
+    )
+    for ancestor_pr in ancestor_prs:
         util.posthog_util.capture_pull_request_event(
             util.posthog_util.PostHogEvent.MERGE_PULL_REQUEST,
-            pr_to_update,
+            ancestor_pr,
         )
-        pr_to_update.set_status("merged", StatusCode.MERGED_BY_MQ)
-        pr_to_update.merged_at = time_util.now()
-        if pr_to_update.merge_commit_sha is None:
-            logger.error(
-                "Missing merge commit SHA for a merged PR",
-                pr_number=pr_to_update.number,
+        ancestor_pr.set_status("merged", StatusCode.MERGED_BY_MQ)
+        ancestor_pr.merged_at = time_util.now()
+        try:
+            pull = client.get_pull(ancestor_pr.number)
+            if ancestor_pr.merge_commit_sha is None:
+                ancestor_pr.merge_commit_sha = pr.merge_commit_sha
+            if ancestor_pr.merge_commit_sha is None:
+                # if commit sha is still None, we should log.
+                logger.error(
+                    "Missing merge commit SHA for a merged PR",
+                    pr_number=ancestor_pr.number,
+                )
+            client.add_label(pull, MERGED_BY_MQ_LABEL)
+            client.close_pull(pull)
+            delete_branch_if_applicable(client, repo, pull)
+            comments.post_pull_comment.delay(
+                ancestor_pr.id, "merged", note=str(pr.number)
             )
-        merged_activity = Activity(
-            repo_id=repo.id,
-            name=ActivityType.MERGED,
-            pull_request_id=pr_to_update.id,
-            status_code=pr_to_update.status_code,
-            payload=ActivityMergedPayload(
-                optimistic_merge_botpr_id=(
-                    optimistic_botpr.id if optimistic_botpr else None
-                ),
-                emergency_merge=pr.emergency_merge,
-            ),
+        except Exception as e:
+            logger.error(
+                "Failed to mark as merged by bot",
+                repo_id=repo.id,
+                pr_number=pr.number,
+                exc_info=e,
+            )
+    db.session.commit()
+    for ancestor_pr in ancestor_prs:
+        update_gh_pr_status.delay(ancestor_pr.id)
+        flexreview.celery_tasks.process_merged_pull.delay(ancestor_pr.id)
+    atc.non_released_prs.update_non_released_prs.delay(pr.repo_id)
+
+
+def mark_ancestor_prs_blocked_by_top(client: GithubClient, pr: PullRequest) -> None:
+    """
+    Mark every ancestor PR as blocked by top
+    """
+    ancestor_prs = stack_manager.get_all_stack_ancestors(pr)
+    repo = pr.repo
+    logger.info(
+        "Repo %d PR %d marking stack ancestors as blocked by top: %s",
+        repo.id,
+        pr.number,
+        ancestor_prs,
+    )
+    for ancestor_pr in ancestor_prs:
+        common.set_pr_blocked(
+            ancestor_pr,
+            StatusCode.BLOCKED_BY_STACK_TOP,
+            f"Top queued PR #{pr.number}.",
         )
-        db.session.add(merged_activity)
+        try:
+            pull = client.get_pull(ancestor_pr.number)
+            client.add_label(pull, repo.blocked_label)
+            comments.post_pull_comment.delay(ancestor_pr.id, "blocked")
+        except Exception as e:
+            logger.error(
+                "Failed to mark as blocked by top",
+                repo_id=repo.id,
+                pr_number=pr.number,
+                exc_info=e,
+            )
+    db.session.commit()
+    for ancestor_pr in ancestor_prs:
+        update_gh_pr_status.delay(ancestor_pr.id)
+
+
+class _InvalidSquashCommitError(Exception):
+    pass
+
+
+def resync_bot_pr(
+    client: GithubClient,
+    repo: GithubRepo,
+    bot_pr: BotPr,
+    *,
+    previous_branch: str,
+    previous_prs: list[PullRequest],
+    previous_bot_pr: BotPr | None,
+    attempt: int = 1,
+) -> str | None:
+    """
+    Resync a BotPR against the given previous branch.
+    :param client: Github client
+    :param repo: GithubRepo
+    :param bot_pr: The BotPR that's being resynced.
+    :param previous_branch: The base branch to resync against (i.e., the branch
+        corresponding to the previous BotPR).
+    :param previous_prs: The list of all PRs whose commit were included in the previous BotPR.
+    :param previous_bot_pr: The previous BotPR, if any.
+    :return: The name of the resynced branch, or None if the resync failed.
+    """
+    bot_pull = client.get_pull(bot_pr.number)
+    slog = logger.bind(
+        repo_id=repo.id,
+        bot_pr_id=bot_pr.id,
+        bot_pr_number=bot_pr.number,
+        bot_pr_branch=bot_pull.head.ref,
+        previous_branch=previous_branch,
+        previous_pr_numbers=[pr.number for pr in previous_prs],
+        attempt=attempt,
+    )
+    slog.info("Resyncing BotPR")
+    batch = Batch(client, bot_pr.batch_pr_list)
+    if batch.did_optimistically_reuse_original_pr(bot_pr):
+        slog.error("Cannot resync BotPR because it's re-using the original PR")
+        return bot_pull.head.ref
+
+    # in order to resync the botPR, we need to
+    # 1 - force-push the branch_to_sync to the bot_pull (this removes changes from that branch)
+    # 2 - apply the changes from the associated original PRs to the bot_pr
+    tmp_branch_name = None
+    db.session.refresh(repo)
+    try:
+        if not repo.parallel_mode:
+            # Not a parallel mode anymore, this likely was changed in-flight.
+            # We can't do anything about it, so we just return the current branch.
+            slog.info("Repository is not in parallel mode, aborting resync")
+            return None
+
+        if repo.parallel_mode_config.use_affected_targets:
+            # In case of affected targets, we will override the previous_prs as we
+            # only account for blocking PRs. Also handle the stacked PRs case, where the blocking
+            # PRs will be a collection of all blocking PRs for all the PRs in the stack.
+            previous_prs_set: set[PullRequest] = set()
+            for pr in batch.prs:
+                for stacked_pr in stack_manager.get_current_stack_ancestors(pr):
+                    previous_prs_set.update(stacked_pr.blocking_prs)
+
+            previous_prs = list(previous_prs_set - set(batch.prs))if (
+            repo.parallel_mode_config.use_affected_targets
+            and previous_bot_pr
+            and not _are_previous_prs_included(
+                previous_prs,
+                latest_bot_pr=previous_bot_pr,
+            )
+        ):
+            # In case of target mode, we take the latest target branch and
+            # then apply all the relevant changes on top of it.
+            # If the previous bot PR already includes all the changes, we don't need
+            # to construct the botPR from scratch. In that case we will skip this loop.
+            latest_sha = client.get_branch_head_sha(batch.target_branch_name)
+            tmp_branch_name = client.copy_to_new_branch(
+                latest_sha, str(batch.get_first_pr().number), prefix="mq-tmp-"
+            )
+            for pr in batch.prs:
+                pull = batch.get_pull(pr.number)
+                client.merge_branch_to_branch(pull.head.ref, tmp_branch_name)
+
+            # Collect all the previous blocking and apply those to the batch.
+            apply_prs_to_branch(
+                client, repo, batch.prs[0], previous_prs, tmp_branch_name
+            )
+            # Update pr_list (these are previous PR commits that are included)
+            bot_pr.pr_list = previous_prs.copy()
+            bot_pr.pr_list.extend(batch.prs)
+            # Reset the test counts.
+            bot_pr.passing_test_count = 0
+            bot_pr.failing_test_count = 0
+            bot_pr.pending_test_count = 0
+
+            bot_pr.head_commit_sha = client.force_push_branch(
+                tmp_branch_name, bot_pull.head.ref
+            )
+            db.session.commit()
+
+            client.delete_ref(tmp_branch_name)
+            if latest_sha == bot_pr.head_commit_sha:
+                # The new bot_pr should never have the same commit as the target branch.
+                slog.info(
+                    "Failed to generate commit for BotPR in parallel mode"
+                    "(squashing pull request onto branch didn't change the HEAD commit SHA)"
+                )
+                # Let's raise exception, so we try one more time before giving up.
+                raise _InvalidSquashCommitError()
+        elif repo.parallel_mode_config.use_fast_forwarding:
+            # Create a temporary branch and resync that to the latest commit.
+            # Once done, we force push that sha to the bot_pull branch and delete temp branch.
+            # This avoids running CI on the bot_pull branch for every commit.
+            latest_sha = client.get_branch_head_sha(previous_branch)
+            tmp_branch_name = client.copy_to_new_branch(
+                latest_sha, str(batch.get_first_pr().number), prefix="mq-tmp-"
+            )
+            client.force_push_branch(previous_branch, tmp_branch_name)
+            _squash_batch_prs_to_branch(client, batch, tmp_branch_name)
+            bot_pr.head_commit_sha = client.force_push_branch(
+                tmp_branch_name, bot_pull.head.ref
+            )
+            # Reset the test counts.
+            bot_pr.passing_test_count = 0
+            bot_pr.failing_test_count = 0
+            bot_pr.pending_test_count = 0
+            db.session.commit()
+            client.delete_ref(tmp_branch_name)
+            if latest_sha == bot_pr.head_commit_sha:
+                # The new bot_pr should never have the same commit as the previous branch.
+                slog.info(
+                    "Failed to generate commit for BotPR for FF"
+                    "(squashing pull request onto branch didn't change the HEAD commit SHA)"
+                )
+                # Let's raise exception, so we try one more time before giving up.
+                raise _InvalidSquashCommitError()
+        else:
+            # instead of blindly pushing the branch_to_sync to bot_branch,
+            # we will create a temporary branch, merge the branch_to_sync into it,
+            # and then push that to the bot_branch.
+            # this generates all new commit SHAs avoid any reruns of CI on same commits.
+            # it also avoids bot_pr closing automatically.
+            logger.info(
+                "Using default parallel mode for resync bot PR",
+                repo_id=repo.id,
+                bot_pr=bot_pr.number,
+                pr_numbers=[pr.number for pr in batch.prs],
+            )
+            latest_sha = client.get_branch_head_sha(previous_branch)
+            tmp_branch_name = client.copy_to_new_branch(
+                latest_sha, str(batch.get_first_pr().number), prefix="mq-tmp-"
+            )
+            for pr in batch.prs:
+                client.merge_branch_to_branch(
+                    batch.get_pull(pr.number).head.ref, tmp_branch_name
+                )
+            bot_pr.head_commit_sha = client.force_push_branch(
+                tmp_branch_name, bot_pull.head.ref
+            )
+            # Reset the test counts.
+            bot_pr.passing_test_count = 0
+            bot_pr.failing_test_count = 0
+            bot_pr.pending_test_count = 0
+            db.session.commit()
+            client.delete_ref(tmp_branch_name)
+            if latest_sha == bot_pr.head_commit_sha:
+                # The new bot_pr should never have the same commit as the previous branch.
+                slog.info(
+                    "Failed to generate commit for BotPR in parallel mode"
+                    "(squashing pull request onto branch didn't change the HEAD commit SHA)"
+                )
+                # Let's raise exception, so we try one more time before giving up.
+                raise _InvalidSquashCommitError()
+
+        bot_pr_description = _bot_pr_body_text(repo, batch, previous_prs)
+        bot_pull.edit(body=bot_pr_description)
+        return bot_pull.head.ref
+    except Exception as exc:
+        # TODO: catching exceptions that are thrown locally is an anti-pattern
+        #   and generally makes the logic harder to understand here
+        is_weird_github_thing = (
+            common.is_network_issue(exc)
+            or isinstance(exc, pygithub.UnknownObjectException)
+            or isinstance(exc, _InvalidSquashCommitError)
+        )
+        if attempt < 2 and is_weird_github_thing:
+            # If Github threw up, give one more try.
+            return resync_bot_pr(
+                client,
+                repo,
+                bot_pr,
+                previous_branch=previous_branch,
+                previous_prs=previous_prs,
+                previous_bot_pr=previous_bot_pr,
+                attempt=attempt + 1,
+            )
+        slog.error(
+            "Failed to resync BotPR",
+            exc_info=exc,
+        )
+        status_reason = None
+        if is_weird_github_thing:
+            status_reason = (
+                "Something went wrong when communicating with GitHub "
+                "and Aviator could not process this pull request. "
+                "Please try again later."
+            )
+        slog.info(
+            "Setting status for BotPR and all target PRs",
+            status_code=StatusCode.MERGE_CONFLICT,
+        )
+        if not repo.parallel_mode:
+            # The parallel mode has been turned off. There is no good way out of resync.
+            raise Exception("Parallel mode is not enabled, giving up on resync")
+        for pr in bot_pr.batch_pr_list:
+            mark_as_blocked(
+                client,
+                repo,
+                pr,
+                batch.get_pull(pr.number),
+                StatusCode.MERGE_CONFLICT,
+                status_reason=status_reason,
+            )
+        bot_pr.set_status("closed", StatusCode.MERGE_CONFLICT)
         db.session.commit()
+        _removed_from_batch(bot_pr.batch_pr_list)
+        if bot_pr.number != batch.get_first_pr().number:
+            close_pulls.delay(
+                repo_id=repo.id,
+                pull_list=[bot_pr.number],
+                # do not delete the branch, since we will use this for debug message
+                delete_ref=(
+                    not isinstance(exc, errors.PRStatusException)
+                    or not exc.conflicting_pr
+                ),
+            )
+    finally:
+        if tmp_branch_name:
+            client.delete_ref(tmp_branch_name)
+
+    return None
+
+
+def merge_pr(
+    client: GithubClient,
+    repo: GithubRepo,
+    pr: PullRequest,
+    pull: pygithub.PullRequest,
+    parallel_mode: bool = False,
+    bot_pull: pygithub.PullRequest | None = None,
+    batch: Batch | None = None,
+    *,
+    optimistic_botpr: BotPr | None = None,
+) -> bool:
+    """
+    Merge a PR using the appropriate strategy for the repo.
+
+    Returns a boolean indicating whether or not the PR was merged by this
+    function.
+
+    :param optimistic_botpr: The BotPR that caused an optimistic merge (if any).
+    """
+    if _is_queue_paused(repo, pull.base.ref):
+        _comment_for_paused(pr)
         logger.info(
-            "Updated pull request after merging",
-            repo_id=repo.id,
-            pr_id=pr_to_update.id,
-            pr_number=pr_to_update.number,
-            pr_status_code=pr_to_update.status_code,
-            optimistic_merge=optimistic_botpr is not None,
+            "Repo %d PR %d skipping merge_pr, queue is paused", repo.id, pr.number
         )
-        send_pr_update_to_channel.delay(pr.id)
-        pilot_data = common.get_pilot_data(pr, "merged")
-        hooks.call_master_webhook.delay(
-            pr_to_update.id, "merged", pilot_data=pilot_data, ci_map={}, note=""
+        return False
+    else:
+        delete_paused(repo.id, pr.number)
+    # If we have reached this point, flag the status as complete.
+    # Do it inline to avoid the status not updated before merging the PR.
+    # Doing a bit of refetching to keep SQLAlchemy happy.
+    av_checks.update_pr_check(pr, status="success")
+    repo = pr.repo
+    try:
+        if pull.merged:
+            return False
+        if not valid_commit_sha(client, repo, pr, pull):
+            return False
+        if _should_merge_draft_pr(pr):
+            if bot_pull:
+                client.fast_forward_merge(bot_pull)
+                prs_to_update = batch.prs if batch else [pr]
+                for p in prs_to_update:
+                    p.merge_commit_sha = bot_pull.head.sha
+                db.session.commit()
+            else:
+                # This should not happen. This is a guardrail so that we don't merge a PR in FF mode.
+                logger.error(
+                    "Repo %d PR %d does not have a valid bot pull", repo.id, pr.number
+                )
+                return False
+        elif pr.stack_parent and repo.merge_strategy.use_separate_commits_for_stack:
+            merge_stacked_pr_via_ff(client, pr, pull)
+            prs_to_update = [pr]
+        else:
+            stack_manager.pre_merge_actions(pr, pull)
+            regex_configs = RegexConfig.query.filter_by(repo_id=repo.id).all()
+            sha = client.merge(
+                pull,
+                repo.merge_strategy.name.value,
+                repo.merge_labels,
+                repo.merge_commit.use_title_and_body,
+                get_commit_message(pr),
+                get_commit_title(pr),
+                regex_configs,
+                stack_manager.get_stacked_pulls(pr, client),
+            )
+            pr.merge_commit_sha = sha
+            db.session.commit()
+            prs_to_update = [pr]
+    except Exception as e:
+        skip_pr, status_code, ci_map, note = handle_failed_merge(
+            client, repo, pr, pull, e, parallel_mode
         )
+        if skip_pr:
+            logger.info(
+                "Repo %d PR %d, skip_pr=%s, status_code=%s, ci_map=%s, note=%s",
+                repo.id,
+                pr.number,
+                skip_pr,
+                status_code,
+                list(ci_map.keys()),
+                note,
+            )
+            return False
+        if status_code == StatusCode.MERGED_BY_MQ:
+            # This is to track the scenario where the PR got merged via a
+            # workaround, so we should not mark it as blocked here.
+            prs_to_update = [pr]
+        else:
+            prs_to_block = (
+                batch.prs
+                if repo.parallel_mode_config.use_fast_forwarding and batch
+                else [pr]
+            )
+            for pr in prs_to_block:
+                batch_pull = batch.get_pull(pr.number) if batch else pull
+                mark_as_blocked(
+                    client,
+                    repo,
+                    pr,
+                    batch_pull,
+                    status_code,
+                    ci_map=ci_map,
+                    note=note,
+                )
+            return False
 
-    # Note: We have to do this *before* deleting branches.
-    handle_stacked_pr_post_merge_fixup(client, repo, pr, pull)
-    delete_branch_if_applicable(client, repo, pull)
+    update_prs_post_merge(
+        client,
+        repo,
+        pr,
+        pull,
+        prs_to_update,
+        optimistic_botpr=optimistic_botpr,
+    )
+    return True
 
-    for pr_to_update in prs_to_update:
-        update_gh_pr_status.delay(pr_to_update.id)
-        flexreview.celery_tasks.process_merged_pull.delay(pr_to_update.id)
-    atc.non_released_prs.update_non_released_prs.delay(repo.id)
-    return pr
+
+def merge_stacked_pr_via_ff(
+    client: GithubClient, pr: PullRequest, pull: pygithub.PullRequest
+) -> None:
+    """
+    This method takes the latest master commit SHA in a tmp branch, and
+    applies all stack PRs on top of it by squashing one at a time. Once
+    all the squash commits are created, it will fast-forward to master / main
+    to the new top commit, and delete the tmp branch.
+
+    Effectively, this is the same workflow as the fast-forwarding mode,
+    except this step happens during merge time, not botPR construction time.
+    """
+    target_git_ref = client.get_git_ref(pr.target_branch_name)
+    tmp_branch = client.copy_to_new_branch(
+        target_git_ref.object.sha, str(pr.number), prefix="mq-tmp-"
+    )
+    try:
+        if pr.status == "merged":
+            logger.info(
+                "This PR is already merged, skipping stack merge",
+                pr_number=pr.number,
+                repo_id=pr.repo_id,
+            )
+            return
+        pr_to_merge_sha = _squash_pull_to_branch(client, pr, pull, tmp_branch)
+        # For Figma: move the target git ref one at a time.
+        for pr_number, head_sha in pr_to_merge_sha:
+            target_git_ref.edit(head_sha)  # don't force
+            time.sleep(1)  # give a second for GitHub to catch up.
+        _set_merge_commit_sha_in_stack(pr.repo_id, pr_to_merge_sha)
+
+        # This should ideally be done in handle_post_merge, but since
+        # this is a special case, it's cleaner to leave it here.
+        client.add_label(pull, MERGED_BY_MQ_LABEL)
+        client.close_pull(pull)
+        delete_branch_if_applicable(client, pr.repo, pull)
+    except Exception as exc:
+        logger.info(
+            "Deleted stale branch due to failed stacked PR merge",
+            repo_id=pr.repo_id,
+            pr=pr.number,
+            exc_info=exc,
+        )
+        raise
+    finally:
+        client.delete_ref(tmp_branch)
 
 
+def merge_attempt_via_ff_if_needed(
+    client: GithubClient, pr: PullRequest, pull: pygithub.PullRequest, message: str
+) -> bool:
+    """
+    This is a workaround only when we are stuck in a state
+    where GH is not letting us merge the PR. We will check if
+    we are in parallel mode (non-ff), and that enough time has
+    passed waiting for GH to merge the PR.
+    """
+    if not pr.repo.parallel_mode:
+        return False
+    logger.info(
+        "Checking if we should attempt FF merge",
+        repo_id=pr.repo_id,
+        pr_number=pr.number,
+        message=message,
+    )
+
+    if _has_exceeded_pending_mergeability_wait(pr, message):
+        merge_stacked_pr_via_ff(client, pr, pull)
+        logger.info(
+            "Successfully merged via FF mode",
+            repo_id=pr.repo_id,
+            pr_number=pr.number,
+        )
+        client.create_issue_comment(
+            pr.number,
+            "Merged via fast-forwarding because GitHub mergeability timed out."
+            f"Additional debug info: {message}",
+        )
+        return True
+    return False
+
+
+def _set_merge_commit_sha_in_stack(
+    repo_id: int, pr_to_merge_sha: list[tuple[int, str]]
+) -> None:
+    # convert back to dictionary
+    pr_to_merge_sha_map = {pr_number: sha for pr_number, sha in pr_to_merge_sha}
+    all_prs: list[PullRequest] = db.session.execute(
+        sa.select(PullRequest)
+        .where(PullRequest.number.in_(pr_to_merge_sha_map.keys()))
+        .where(PullRequest.repo_id == repo_id)
+    ).scalars().all()
+    for pr in all_prs:
+        pr.merge_commit_sha = pr_to_merge_sha_map[pr.number]
+    db.session.commit()
+
+
+def update_prs_post_merge(
+    client: GithubClient,
+    repo: GithubRepo,
+    pr: PullRequest,
+    pull: pygithub.PullRequest,
+    prs_to_update: list[PullRequest],
+    *,
+    optimistic_botpr: BotPr | None,
+) -> PullRequest:
+    """
+    Update pull requests after merging them on GitHub.
 def _has_equal_commit_hash(
     client: GithubClient, repo: GithubRepo, target_branch: str, new_branch: str
 ) -> bool:
@@ -6940,7 +8565,7 @@ def _is_merge_blocked_by_not_authorized(
     :param error: The exception raised by the GitHub API.
     :param pull: The GitHub API PullRequest object.
     :return: True if the PR is blocked by not authorized.
-    """
+    """"""
     # Heuristic based on the actual error payload that GitHub returns.
     if error:
         message = getattr(error, "data", {}).get("message", "")
@@ -7057,7 +8682,7 @@ def pending_error_message(error_message: str) -> bool:
 
 
 # This should really not fail at all. Adding retry with exponential backoff of up to 20 mins.
-@celery.task(
+@celery.shared_task(
     autoretry_for=(Exception,),
     retry_backoff=True,
     retry_backoff_max=1200,
@@ -7302,15 +8927,16 @@ class _BotPRMetadata(schema.BaseModel):
     """
     Metadata stored as JSON in the body text of a BotPR.
 
-    Some customers rely on this so updated should be backwards compatible.
-    """
+    Some customers rely on this so updated should be backwards compatible.class PullRequest(schema.BaseModel):
+    number: int
+    head_commit: str
 
-    class PullRequest(schema.BaseModel):
-        number: int
-        head_commit: str
+    class Config:
+        # In SQLAlchemy 2.0, model_dump_json is used instead of model_dump_json
+        model_config = {"json_dumps": lambda v, default: json.dumps(v, default=default)}
 
-    pull_requests: list[PullRequest]
-    target_branch: str
+pull_requests: list[PullRequest]
+target_branch: str
 
 
 def _bot_pr_body_text(
@@ -7739,7 +9365,7 @@ def should_process_pr(
     We will return True if the given test_name is a required check and:
     - either the PR has a definite failure (status = "failure", "error")
     - or all the required checks are completed.
-    """
+    """"""
     repo = pr.repo
     required_patterns: set[str] = {
         test.name for test in repo.get_required_tests(botpr=is_bot_pr)
@@ -8120,26 +9746,26 @@ def _stack_merge(
 ) -> bool:
     """
     Returns true if the PR was queued successfully, false otherwise.
-    """
-    if not client:
-        _, client = common.get_client(repo)
+    """```python
+if not client:
+    _, client = common.get_client(repo)
 
-    result, message = stack_manager.validate_and_set_stack_as_ready(
-        client,
-        pr,
-        pr_stack,
-    )
-    if not result:
-        client.create_issue_comment(pr.number, message)
-        return False
+result, message = stack_manager.validate_and_set_stack_as_ready(
+    client,
+    pr,
+    pr_stack,
+)
+if not result:
+    client.create_issue_comment(pr.number, message)
+    return False
 
-    # In case of a successful stack-queue, the sticky-comment will be updated through the fetch async task.
-    ancestor_prs = stack_manager.get_current_stack_ancestors(pr)
-    ancestor_prs.reverse()
-    for pr in ancestor_prs:
-        # pretend as if the PR was labeled ready. This should also update the sticky comment.
-        fetch_pr.delay(pr.number, repo.name, action="labeled", label=repo.queue_label)
-    return True
+# In case of a successful stack-queue, the sticky-comment will be updated through the fetch async task.
+ancestor_prs = stack_manager.get_current_stack_ancestors(pr)
+ancestor_prs.reverse()
+for pr in ancestor_prs:
+    # pretend as if the PR was labeled ready. This should also update the sticky comment.
+    fetch_pr.delay(pr.number, repo.name, action="labeled", label=repo.queue_label)
+return True
 
 
 def simple_or_stack_dequeue(
@@ -8254,3 +9880,4 @@ def _update_approval(gql: graphql.GithubGql, pr: PullRequest) -> tuple[bool, boo
         pr.is_codeowner_approved = pr_codeowner_approved
     db.session.commit()
     return pr_codeowner_approved, pr_changes_requested
+```
