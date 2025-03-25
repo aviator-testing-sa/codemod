@@ -13,9 +13,6 @@ from flask import redirect
 from flask import render_template
 from flask import request
 from flask import session
-from flask.ext.login import LoginManager
-from flask.ext.login import current_user
-from flask.ext.sqlalchemy import SQLAlchemy
 from raven.contrib.flask import Sentry
 from user.current_user import CurrentUser
 from user.current_user import Anonymous
@@ -60,13 +57,14 @@ are defined and parsed by SQL Alchemy.
 '''
 import schema
 
+# add back new comment
 
 '''
 Initialize mail
 
 def create_mail(app):
-    import flask.ext.mail
-    mail = flask.ext.mail.Mail()
+    # WOW I REPLACED THIS
+    mail = flask_mail.Mail()
     mail.init_app(app)
     return mail
 
