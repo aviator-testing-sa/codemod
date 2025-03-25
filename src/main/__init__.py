@@ -13,9 +13,7 @@ from flask import redirect
 from flask import render_template
 from flask import request
 from flask import session
-from flask.ext.login import LoginManager
-from flask.ext.login import current_user
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from raven.contrib.flask import Sentry
 from user.current_user import CurrentUser
 from user.current_user import Anonymous
@@ -53,6 +51,59 @@ def create_db(app):
 
 db = create_db(app)
 
+'''
+Initialize models. This import makes sure all#!/usr/bin/python
+
+import config
+import datetime
+import jinja2
+import logging
+import os
+import functools
+import flask
+from flask import Flask
+from flask import abort
+from flask import redirect
+from flask import render_template
+from flask import request
+from flask import session
+from flask_sqlalchemy import SQLAlchemy
+from raven.contrib.flask import Sentry
+from user.current_user import CurrentUser
+from user.current_user import Anonymous
+
+'''
+The main application setup. The order of things is important
+in this file.
+'''
+from flask_wtf.csrf import CsrfProtect
+csrf = CsrfProtect()
+
+def create_app(testing=False):
+    app = Flask(__name__, static_folder='../static', template_folder='../templates')
+    app.config.from_object('config.base')
+    app.config.from_envvar('APP_CONFIG_FILE')
+    app.config['APP_ROOT'] = os.path.dirname(os.path.abspath(__file__))
+    app.config['ENVIRONMENT'] = os.environ.get('ENVIRONMENT', 'dev')
+
+    # monkey patch some easy-to-use routes
+    app.get = functools.partial(app.route, methods=['GET'])
+    app.post = functools.partial(app.route, methods=['POST'])
+    app.delete = functools.partial(app.route, methods=['DELETE'])
+    app.put = functools.partial(app.route, methods=['PUT'])
+
+    return app
+
+app = create_app()
+
+
+'''
+Initialize database
+'''
+def create_db(app):
+    return SQLAlchemy(app)
+
+db = create_db(app)
 
 '''
 Initialize models. This import makes sure all the models
@@ -60,13 +111,14 @@ are defined and parsed by SQL Alchemy.
 '''
 import schema
 
+# add back new comment
 
 '''
 Initialize mail
 
 def create_mail(app):
-    import flask.ext.mail
-    mail = flask.ext.mail.Mail()
+    # WOW I REPLACED THIS
+    # WOW I REPLACED THIS
     mail.init_app(app)
     return mail
 
