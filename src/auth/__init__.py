@@ -1,5 +1,4 @@
 import utils
-from flask.ext.login import current_user
 from functools import wraps
 
 
@@ -24,4 +23,3 @@ def seller_required(func):
             print "ABORTING@@"
             return utils.abort(400, detail="Not an authorized seller")
     return wrapped
-
