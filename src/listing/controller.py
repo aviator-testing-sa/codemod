@@ -215,7 +215,7 @@ def build_search_listing(string, asmatch=False, order="-updated", limit=50, offs
 
     # build query
     qry = db.session.query(cls)
-    for k,v in filters.iteritems():
+    for k,v in filters.items():
         qry = filter(qry, k, v)
 
     # build search string
@@ -227,7 +227,7 @@ def build_search_listing(string, asmatch=False, order="-updated", limit=50, offs
 
     # build ordering
     if order is not None:
-        if isinstance(order, basestring):
+        if isinstance(order, str):
             order = order,
         for o in order:
             attr = getattr(cls, o)
