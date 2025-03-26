@@ -1,6 +1,3 @@
-from flask.ext.login import AnonymousUserMixin
-
-
 class CurrentUser:
     def __init__(self, user):
         self.userid = user.id
@@ -32,6 +29,26 @@ class CurrentUser:
         return 'en_US'
 
 
-class Anonymous(AnonymousUserMixin):
+class Anonymous:
+    def __init__(self):
+        self.authenticated = False
+        self.active = False
+        self.anonymous = True
+
+    @property
+    def is_authenticated(self):
+        return False
+
+    @property
+    def is_active(self):
+        return False
+
+    @property
+    def is_anonymous(self):
+        return True
+
+    def get_id(self):
+        return None
+
     def get_locale(self):
         return 'en_US'
