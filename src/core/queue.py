@@ -1669,7 +1669,8 @@ def update_bot_pr_on_pr_merge(
         all_prs=[p.number for p in bot_pr.batch_pr_list],
     )
     bot_pull = client.get_pull(bot_pr.number)
-    handle_post_merge(client, repo, pr, pull, bot_pr, bot_pull)
+    batch = Batch(client, bot_pr.batch_pr_list)
+    handle_post_batch_merge(client, repo, batch, bot_pr, bot_pull)
     return True
 
 
@@ -1714,10 +1715,8 @@ def ensure_bot_pull_status(
                 bot_pr.batch_pr_list,
                 optimistic_botpr=None,
             )
-            for pr in bot_pr.batch_pr_list:
-                handle_post_merge(
-                    client, repo, pr, client.get_pull(pr.number), bot_pr, bot_pull
-                )
+            batch = Batch(client, bot_pr.batch_pr_list)
+            handle_post_batch_merge(client, repo, batch, bot_pr, bot_pull)
             return
         bot_pr.set_status("closed", StatusCode.PR_CLOSED_MANUALLY)
         db.session.commit()
@@ -3343,7 +3342,10 @@ def tag_new_batch(client: GithubClient, repo: GithubRepo, batch: Batch) -> None:
             batch.pr_numbers,
         )
         try:
-            new_branch = create_bot_branch(client, repo, batch, previous_prs)
+            # Reassign the previous PRs based on how the draft PR was constructed.
+            new_branch, previous_prs = create_bot_branch(
+                client, repo, batch, previous_prs
+            )
             if _has_equal_commit_hash(
                 client, repo, batch.target_branch_name, new_branch
             ):
@@ -3705,7 +3707,7 @@ def create_bot_branch(
     repo: GithubRepo,
     batch: Batch,
     previous_prs: list[PullRequest],
-) -> str:
+) -> tuple[str, list[PullRequest]]:
     """
     Creates a branch to be used as draft PR in parallel mode. There are three modes to create branches,
     in fast forwarding mode, we start from the last bot PR as the baseline and then "squash merge"
@@ -3722,14 +3724,19 @@ def create_bot_branch(
     :return: the newly created branch name
     """
     if repo.parallel_mode_config.use_fast_forwarding:
-        return create_bot_branch_for_fast_forward(client, repo, batch)
+        return create_bot_branch_for_fast_forward(client, repo, batch), previous_prs
 
     # Fetch the oldest bot PR that satisfies all previous PRs
     oldest_bot_pr = get_oldest_bot_pr(repo, batch.target_branch_name, previous_prs)
     if _should_recreate_from_target_branch(repo, batch, oldest_bot_pr):
-        return create_bot_branch_from_target_branch(client, repo, batch, previous_prs)
+        return create_bot_branch_from_target_branch(
+            client, repo, batch, previous_prs
+        ), previous_prs
 
-    return create_bot_branch_default(client, repo, batch, oldest_bot_pr)
+    if oldest_bot_pr:
+        previous_prs = oldest_bot_pr.pr_list
+    # In case of recreating from the oldest bot PR, use its PR list as the base.
+    return create_bot_branch_default(client, repo, batch, oldest_bot_pr), previous_prs
 
 
 def _should_recreate_from_target_branch(
@@ -4997,11 +5004,7 @@ def batch_fast_forward_merge(
     )
     pr_ids = [pr.id for pr in batch.prs]
     if did_merge:
-        for pr in batch.prs:
-            handle_post_merge(
-                client, repo, pr, batch.get_pull(pr.number), bot_pr, bot_pull
-            )
-        hooks.call_webhook_for_batch.delay(bot_pr.id, pr_ids, "batch_merged")
+        handle_post_batch_merge(client, repo, batch, bot_pr, bot_pull)
         process_top_async.delay(repo.id, batch.target_branch_name)
         tag_queued_prs_async.delay(repo.id)
     elif pr.status == "blocked":
@@ -5105,8 +5108,7 @@ def batch_merge(
     if not needs_retry:
         # Only close bot_pr when all PRs are merged. In case of retry, the bot_pr is
         # closed after retry is complete.
-        handle_post_merge(client, repo, batch.prs[0], None, bot_pr, bot_pull)
-        hooks.call_webhook_for_batch.delay(bot_pr.id, pr_ids, "batch_merged")
+        handle_post_batch_merge(client, repo, batch, bot_pr, bot_pull)
     process_top_async.delay(repo.id, batch.target_branch_name)
     tag_queued_prs_async.delay(repo.id)
 
@@ -5199,14 +5201,8 @@ def _handle_emergency_merge_with_lock(pr: PullRequest) -> None:
                     assert bot_pr, (
                         f"bot_pr should exist for repo {repo.id} PR {pr.number}"
                     )
-                    handle_post_merge(
-                        client,
-                        repo,
-                        pr,
-                        client.get_pull(pr.number),
-                        bot_pr,
-                        bot_pull,
-                    )
+                    batch = Batch(client, bot_pr.batch_pr_list)
+                    handle_post_batch_merge(client, repo, batch, bot_pr, bot_pull)
                 else:
                     logger.info(
                         "Keeping a BotPR since some of its PRs are not merged/closed",
@@ -5377,12 +5373,8 @@ def retry_merge(pr_id: int) -> None:
                     pending_pr=p.number,
                 )
                 return
-
-        handle_post_merge(
-            client, repo, pr, pull, bot_pr, client.get_pull(bot_pr.number)
-        )
-        pr_ids = [p.id for p in bot_pr.batch_pr_list]
-        hooks.call_webhook_for_batch(bot_pr.id, pr_ids, "batch_merged")
+        batch = Batch(client, bot_pr.batch_pr_list)
+        handle_post_batch_merge(client, repo, batch, bot_pr, bot_pull)
 
 
 @dataclasses.dataclass
@@ -5888,7 +5880,38 @@ def comment_blocked_with_ci(pr: PullRequest, ci_map: dict[str, str]) -> None:
     )
 
 
-def handle_post_merge(
+def handle_post_batch_merge(
+    client: GithubClient,
+    repo: GithubRepo,
+    batch: Batch,
+    bot_pr: BotPr,
+    bot_pull: pygithub.PullRequest,
+) -> None:
+    """
+    This method is called as a central place to handle all post-merge actions for a batch.
+    It will go through each PR to make sure that they are already merged, and then close
+    the botPR as well as send out the necessary webhooks.
+    """
+    for pr in batch.prs:
+        if pr.status != "merged":
+            logger.error(
+                "Some PRs in batch are not merged",
+                pr_number=pr.number,
+                repo_id=repo.id,
+                batch_prs=batch.prs,
+            )
+            return
+
+    for pr in batch.prs:
+        _handle_post_merge(
+            client, repo, pr, batch.get_pull(pr.number), bot_pr, bot_pull
+        )
+    hooks.call_webhook_for_batch.delay(
+        bot_pr.id, [p.id for p in batch.prs], "batch_merged"
+    )
+
+
+def _handle_post_merge(
     client: GithubClient,
     repo: GithubRepo,
     pr: PullRequest,
@@ -5935,7 +5958,9 @@ def handle_post_merge(
                 exc_info=e,
             )
             if retry:
-                handle_post_merge(client, repo, pr, pull, bot_pr, bot_pull, retry=False)
+                _handle_post_merge(
+                    client, repo, pr, pull, bot_pr, bot_pull, retry=False
+                )
             else:
                 logger.error(
                     "Failed to handle post merge",
@@ -6434,7 +6459,7 @@ def merge_stacked_pr_via_ff(
             time.sleep(1)  # give a second for GitHub to catch up.
         _set_merge_commit_sha_in_stack(pr.repo_id, pr_to_merge_sha)
 
-        # This should ideally be done in handle_post_merge, but since
+        # This should ideally be done in handle_post_batch_merge, but since
         # this is a special case, it's cleaner to leave it here.
         client.add_label(pull, MERGED_BY_MQ_LABEL)
         client.close_pull(pull)
