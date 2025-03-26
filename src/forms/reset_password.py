@@ -1,9 +1,9 @@
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import PasswordField
 from wtforms import validators
 
 
-class ResetPasswordForm(Form):
+class ResetPasswordForm(FlaskForm):
     password = PasswordField('',
             validators=[validators.DataRequired(),
                         validators.Length(min=6, max=50)])
@@ -13,7 +13,7 @@ class ResetPasswordForm(Form):
                         validators.Length(min=6, max=50)])
 
     def validate(self, forgot=False):
-        if not Form.validate(self):
+        if not FlaskForm.validate(self):
             return False
         if self.password.data != self.password_confirm.data:
             self.password_confirm.errors.append('Passwords do not match.')

@@ -1,7 +1,7 @@
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import TextAreaField
 from wtforms import validators
 
 
-class SubmitInterestForm(Form):
+class SubmitInterestForm(FlaskForm):
     text = TextAreaField(validators=[validators.Optional()])

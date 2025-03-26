@@ -1,5 +1,5 @@
 from wtforms import widgets
-from wtforms.ext.sqlalchemy.fields import QuerySelectMultipleField
+from sqlalchemy_utils.types.choice import QuerySelectMultipleField
 
 
 class MultiCheckboxField(QuerySelectMultipleField):
