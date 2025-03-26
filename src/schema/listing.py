@@ -72,7 +72,7 @@ class Listing(Base):
     @classmethod
     def filter_like_domain(cls, domain, asmatch=False):
         if asmatch:
-            return cls.domain.match(name)
+            return cls.domain.match(domain)
         return cls.domain.like('%{}%'.format(domain))
 
     @classmethod
@@ -80,4 +80,3 @@ class Listing(Base):
         if asmatch:
             return cls.category.match(category)
         return cls.category.like('%{}%'.format(category))
-

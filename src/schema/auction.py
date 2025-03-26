@@ -1,7 +1,3 @@
-#
-# auction.py
-#
-#
 import datetime
 from sqlalchemy import orm
 from main import db
