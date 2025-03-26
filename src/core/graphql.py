@@ -446,7 +446,12 @@ class GithubGql:
                 count=count,
             )
 
-            if not result.data:
+    def __record_rate_limit(self, rate_limit_data: dict[str, Any]) -> None:
+        rate_limit.set_gh_graphql_api_limit(
+            self.account_id,
+            remaining=rate_limit_data.get("remaining", 0),
+            total=rate_limit_data.get("limit", 0),
+        )if not result.data:
                 logger.error(
                     "Failed to fetch data for repo %s from github graphql %s",
                     repo.id,
@@ -888,9 +893,7 @@ class GithubGql:
         """Get the users who approved the PR and the changed files.
 
         :param repo_name: The repository name.
-        :param pr_num: The PR number.
-
-        :raises GithubGqlException: Raised if it fails to fetch data.
+        :param pr_num: The PR number.:raises GithubGqlException: Raised if it fails to fetch data.
         """
         owner, name = repo_name.split("/")
         try:
@@ -1247,14 +1250,14 @@ class GithubGql:
         try:
             result = self.__client.mark_ready_for_review(pull_request_id=pr_node_id)
         except gh_graphql.GraphQLClientError as exc:
-            raise GithubGqlException from exc
+            raise GithubGqlException() from exc
 
         if (
             not result
             or not result.mark_pull_request_ready_for_review
             or not result.mark_pull_request_ready_for_review.pull_request
         ):
-            raise GithubGqlNoDataException
+            raise GithubGqlNoDataException()
 
         if result.mark_pull_request_ready_for_review.pull_request.is_draft:
             raise GithubGqlMutationException("Failed to mark PR as ready for review")

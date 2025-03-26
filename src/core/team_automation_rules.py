@@ -85,10 +85,8 @@ def _propagate_to_child_teams(
     ).all()
     existing_mappings = db.session.scalars(
         sa.select(TeamAutomationRuleMapping).where(
-            TeamAutomationRuleMapping.github_team_id
-            == sa.func.any([t.id for t in child_teams]),
-            TeamAutomationRuleMapping.team_automation_rule_id
-            == sa.func.any([r.id for r in team_rules]),
+            TeamAutomationRuleMapping.github_team_id.in_([t.id for t in child_teams]),
+            TeamAutomationRuleMapping.team_automation_rule_id.in_([r.id for r in team_rules]),
         ),
     ).all()
     existing_pairs = {

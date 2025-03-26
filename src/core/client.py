@@ -17,7 +17,7 @@ import typing_extensions as TE
 from dateutil.parser import parse
 
 # TODO: Can we just use requests.adapters.Retry?
-from requests.packages.urllib3.util.retry import Retry  # type: ignore[import-not-found]
+from urllib3.util.retry import Retry
 
 import errors
 import instrumentation
@@ -434,8 +434,7 @@ class GithubClient:
         return len(required_approvers) == 0 or any(
             [ra in approve_set for ra in required_approvers]
         )
-
-    def get_test_list(self, sha: str) -> list[str]:
+def get_test_list(self, sha: str) -> list[str]:
         combined_statuses = custom_checks.fetch_gh_commit_statuses(
             self.access_token,
             self.repo.full_name,
@@ -876,9 +875,7 @@ class GithubClient:
         squash_commits: list[pygithub.GitCommit] = [
             self.repo.get_commit(target_sha).commit,
         ]
-        pr_to_merge_sha = {}
-
-        try:
+        pr_to_merge_sha = {}try:
             for input in pulls:
                 pull = input.pull
                 # Create the merge commit M[N]. Since we're applying it to the
@@ -1019,7 +1016,7 @@ class GithubClient:
         self,
         target_branch: str,
         sha: str,
-        commit_message: str | pygithub.NotSetType = "",
+        commit_message: str | pygithub.NotSet = "",
     ) -> pygithub.Commit | None:
         if not commit_message:
             commit_message = pygithub.NotSet

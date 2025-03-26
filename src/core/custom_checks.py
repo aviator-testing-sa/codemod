@@ -369,7 +369,7 @@ def _update_test_statuses(
     fetched_statuses: list[FetchedTestStatus],
 ) -> list[GithubTestStatus]:
     results: list[GithubTestStatus] = []
-    status_list: list[GithubTestStatus] = db.session.scalars(
+    status_list: list[GithubTestStatus] = db.session.execute(
         sa.select(GithubTestStatus).where(
             GithubTestStatus.repo_id == repo.id,
             GithubTestStatus.commit_id == commit.id,
@@ -378,7 +378,7 @@ def _update_test_statuses(
                 [st.gh_test.id for st in fetched_statuses],
             ),
         ),
-    ).all()
+    ).scalars().all()
     statuses: dict[tuple[int, str | None], GithubTestStatus] = {
         (status.github_test_id, status.job_url): status for status in status_list
     }
@@ -446,15 +446,17 @@ def _update_test_statuses(
 def get_acceptable_statuses_map(
     github_test_ids: Iterable[int],
     for_override: bool,
-) -> dict[int, list[TestStatus]]:
-    """
+) -> dict[int, list[TestStatus]]:"""
     Get a map of github_test_id to a list of acceptable statuses.
     """
     ats: list[AcceptableTestStatus] = (
-        AcceptableTestStatus.query.filter(
-            AcceptableTestStatus.github_test_id.in_(github_test_ids)
+        db.session.scalars(
+            sa.select(AcceptableTestStatus)
+            .where(
+                AcceptableTestStatus.github_test_id.in_(github_test_ids),
+                AcceptableTestStatus.for_override == for_override,
+            )
         )
-        .filter_by(for_override=for_override)
         .all()
     )
     result: dict[int, list[TestStatus]] = {}
@@ -700,13 +702,13 @@ def update_test_statuses_from_summary(
 def get_github_test_from_url(
     repo_id: int, url: str, sha: str, github_test_id: int
 ) -> GithubTestStatus | None:
-    return (
-        GithubTestStatus.query.filter_by(
-            head_commit_sha=sha,
-            repo_id=repo_id,
-            github_test_id=github_test_id,
-            job_url=url,
+    return db.session.scalar(
+        sa.select(GithubTestStatus)
+        .where(
+            GithubTestStatus.head_commit_sha == sha,
+            GithubTestStatus.repo_id == repo_id,
+            GithubTestStatus.github_test_id == github_test_id,
+            GithubTestStatus.job_url == url,
         )
         .order_by(GithubTestStatus.created.desc())
-        .first()
     )

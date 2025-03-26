@@ -414,7 +414,7 @@ class Configurator:
                 config_data=configuration.model_dump(),
                 config_text=text
                 or configurator_schema.toyaml(exclude_none=True, exclude_unset=True),
-                applied_at=datetime.datetime.now(datetime.UTC) if applied else None,
+                applied_at=datetime.datetime.now(datetime.timezone.utc) if applied else None,
             )
             if not self.has_config_changed(potential_change=history):
                 logger.info(
@@ -444,8 +444,7 @@ class Configurator:
         config = Configuration.model_validate(config_history_record.config_data)
         return config.scenarios
 
-    def generate_merge_rules(self) -> MergeRules:
-        """
+    def generate_merge_rules(self) -> MergeRules:"""
         Build merge rules from various related db objects (labels, validations, etc.).
         This should only be used if no config history exist. Generating rules through
         this method otherwise is likely to drop some of the rules in the config.
@@ -571,7 +570,7 @@ class Configurator:
         return configurator_schema.toyaml(exclude_none=True, exclude_unset=True)
 
     def has_config_changed(self, *, potential_change: ConfigHistory) -> bool:
-        latest_config_record: None | (ConfigHistory) = self.repo.current_config_history
+        latest_config_record: None | ConfigHistory = self.repo.current_config_history
         # if there is no latest record then the config has always changed
         if not latest_config_record:
             return True

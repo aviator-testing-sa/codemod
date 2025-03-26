@@ -44,12 +44,14 @@ def ensure(
     # Try to find an existing record with the database ID filled.
     # This doesn't require a lock because the database ID is immutable and
     # uniqueness is enforced by the database.
-    existing: models.GithubUser | None = models.GithubUser.query.filter(
-        models.GithubUser.account_id == account_id,
-        models.GithubUser.deleted == False,
-        models.GithubUser.gh_type == models.GithubUserType(gh_type),
-        models.GithubUser.gh_database_id == gh_database_id,
-    ).one_or_none()
+    existing: models.GithubUser | None = db.session.execute(
+        sa.select(models.GithubUser).filter(
+            models.GithubUser.account_id == account_id,
+            models.GithubUser.deleted == False,
+            models.GithubUser.gh_type == models.GithubUserType(gh_type),
+            models.GithubUser.gh_database_id == gh_database_id,
+        )
+    ).scalar_one_or_none()
     if existing:
         existing.gh_node_id = gh_node_id or existing.gh_node_id
         # This might be a slight data race here, but that's overall fine since
@@ -197,8 +199,8 @@ def lookup_by_login_do_not_use_unless_you_know_what_youre_doing(
         If you break a pinky promise, you'll make babies cry. Don't do that.
     """
     assert yes_i_pinky_promise_i_know_what_im_doing is True
-    return (
-        models.GithubUser.query.filter(
+    return db.session.execute(
+        sa.select(models.GithubUser).filter(
             models.GithubUser.account_id == account_id,
             models.GithubUser.username == login,
             models.GithubUser.deleted == False,
@@ -206,8 +208,7 @@ def lookup_by_login_do_not_use_unless_you_know_what_youre_doing(
         # We miiiiiight have multiple GithubUser models with the same login.
         # Return the oldest just to ensure deterministic behavior.
         .order_by(models.GithubUser.id.asc())
-        .first()
-    )
+    ).scalar_one_or_none()
 
 
 def fetch_by_login_do_not_use_unless_you_know_what_youre_doing(

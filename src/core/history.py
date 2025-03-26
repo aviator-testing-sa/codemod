@@ -10,7 +10,7 @@ def get_diff_by_history(config_history: ConfigHistory) -> str:
         ConfigHistory.query.filter_by(
             repo_id=config_history.repo_id, config_type=ConfigType.Main
         )
-        .filter(ConfigHistory.applied_at.isnot(None))
+        .filter(ConfigHistory.applied_at.is_(not None))
         .filter(ConfigHistory.id < config_history.id)
         .order_by(ConfigHistory.created.desc())
         .first()

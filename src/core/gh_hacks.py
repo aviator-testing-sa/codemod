@@ -21,7 +21,7 @@ def _makeDatetimeAttribute(*args: Any) -> Any:
     if isinstance(res, _ValuedAttribute):
         value = res.value
         if isinstance(value, datetime.datetime):
-            value = value.replace(tzinfo=datetime.UTC)
+            value = value.replace(tzinfo=datetime.timezone.utc)
             return _ValuedAttribute(value)
     return res
 

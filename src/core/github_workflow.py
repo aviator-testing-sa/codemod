@@ -31,9 +31,9 @@ def fetch_repository_github_workflows(token: AccessToken, repo: GithubRepo) -> N
         num_workflows=len(gh_workflows),
     )
 
-    all_repo_workflows: list[GithubWorkflow] = GithubWorkflow.query.filter_by(
-        repo_id=repo.id
-    ).all()
+    all_repo_workflows: list[GithubWorkflow] = db.session.execute(
+        db.select(GithubWorkflow).filter_by(repo_id=repo.id)
+    ).scalars().all()
     existing_workflows: set[str] = set()
 
     for gh_workflow in gh_workflows:
@@ -70,9 +70,9 @@ def ensure_github_workflow(
     gh_database_id: int,
     gh_node_id: str,
 ) -> GithubWorkflow:
-    wf: GithubWorkflow | None = GithubWorkflow.query.filter_by(
-        repo_id=repo_id, path=path
-    ).first()
+    wf: GithubWorkflow | None = db.session.execute(
+        db.select(GithubWorkflow).filter_by(repo_id=repo_id, path=path)
+    ).scalar_one_or_none()
 
     if not wf:
         wf = GithubWorkflow(

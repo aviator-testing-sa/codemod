@@ -435,9 +435,7 @@ def set_sticky_comment(
         if not comment_id:
             logger.info("No sticky comment ID. Creating a new one")
             comment = client.create_issue_comment(pr_number, body)
-            return str(comment.node_id)
-
-        logger.info("Updating sticky comment in place", comment_id=comment_id)
+            return str(comment.node_id)logger.info("Updating sticky comment in place", comment_id=comment_id)
         res = client.gql_client.fetch(
             """
             mutation updateIssueComment($input: UpdateIssueCommentInput!) {

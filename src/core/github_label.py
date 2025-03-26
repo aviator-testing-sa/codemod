@@ -13,7 +13,8 @@ def create_default_labels(repo_id: int) -> None:
     _, client = get_client(repo)
 
     queue_label: GithubLabel | None = (
-        GithubLabel.query.filter_by(repo_id=repo.id)
+        db.session.query(GithubLabel)
+        .filter_by(repo_id=repo.id)
         .filter(
             GithubLabel.purpose == GithubLabelPurpose.Queue,
         )
@@ -30,7 +31,8 @@ def create_default_labels(repo_id: int) -> None:
         client.create_label(app.config["DEFAULT_READY_LABEL"], "0E8A16")
 
     skip_line_label: GithubLabel | None = (
-        GithubLabel.query.filter_by(repo_id=repo.id)
+        db.session.query(GithubLabel)
+        .filter_by(repo_id=repo.id)
         .filter(
             GithubLabel.purpose == GithubLabelPurpose.SkipLine,
         )
@@ -47,7 +49,8 @@ def create_default_labels(repo_id: int) -> None:
         client.create_label(app.config["DEFAULT_SKIP_LABEL"], "D93F0B")
 
     blocked_label: GithubLabel | None = (
-        GithubLabel.query.filter_by(repo_id=repo.id)
+        db.session.query(GithubLabel)
+        .filter_by(repo_id=repo.id)
         .filter(
             GithubLabel.purpose == GithubLabelPurpose.Blocked,
         )

@@ -51,7 +51,7 @@ def update_pr(
             ),
         )
         db.session.execute(
-            sa_pg.insert(target_pr_mapping).values(
+            sa.insert(target_pr_mapping).values(
                 [
                     {"pull_request_id": pr.id, "affected_target_id": target.id}
                     for target in target_dict.values()
@@ -85,7 +85,7 @@ def queue_pr_with_targets(
         ),
     )
     db.session.execute(
-        sa_pg.insert(target_pr_mapping).values(
+        sa.insert(target_pr_mapping).values(
             [
                 {"pull_request_id": pr.id, "affected_target_id": target.id}
                 for target in target_dict.values()
