@@ -2,8 +2,8 @@ import errors
 from activity import controller
 from flask import jsonify
 from flask import render_template
-from flask.ext.login import login_required
-from flask.ext.login import current_user
+from flask_login import login_required
+from flask_login import current_user
 from forms.create_bid import CreateBidForm
 from forms.submit_interest import SubmitInterestForm
 from main import app
@@ -44,4 +44,3 @@ def show_all_activities(auction_id):
     activities = controller.get_activities(auction)
     return render_template('forms/show_all_activities.html',
         auction=auction, activities=activities)
-
