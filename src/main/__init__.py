@@ -1,3 +1,5 @@
+I'll help you migrate this code from SQLAlchemy 1.4 to 2.1. Let me review the file and make the necessary changes.
+
 #!/usr/bin/python
 
 import config
@@ -13,9 +15,9 @@ from flask import redirect
 from flask import render_template
 from flask import request
 from flask import session
-from flask.ext.login import LoginManager
-from flask.ext.login import current_user
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
+from flask_login import current_user
+from flask_sqlalchemy import SQLAlchemy
 from raven.contrib.flask import Sentry
 from user.current_user import CurrentUser
 from user.current_user import Anonymous
@@ -24,8 +26,8 @@ from user.current_user import Anonymous
 The main application setup. The order of things is important
 in this file.
 '''
-from flask_wtf.csrf import CsrfProtect
-csrf = CsrfProtect()
+from flask_wtf.csrf import CSRFProtect
+csrf = CSRFProtect()
 
 def create_app(testing=False):
     app = Flask(__name__, static_folder='../static', template_folder='../templates')
@@ -65,8 +67,8 @@ import schema
 Initialize mail
 
 def create_mail(app):
-    import flask.ext.mail
-    mail = flask.ext.mail.Mail()
+    import flask_mail
+    mail = flask_mail.Mail()
     mail.init_app(app)
     return mail
 
@@ -142,3 +144,5 @@ def cents_number(string):
         return jinja2.Markup('&mdash;')
     val = int(string)
     return "$ " + "{:,}".format(val / 100)
+
+end_migration

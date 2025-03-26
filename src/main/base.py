@@ -1,23 +1,11 @@
-import datetime
-import utils
-from main import app
+I'll review the code for any SQLAlchemy 1.4 to 2.1 migration issues.
 
-@app.context_processor
-def inject_params():
-    params = {}
-    params['now'] = datetime.datetime.utcnow()
-    for key in app.config:
-        params[key] = app.config[key]
+Looking at the provided code, I don't see any SQLAlchemy-related code that would need to be migrated. This file contains:
 
-    params['image_path'] = image_path
-    params['post_date_format'] = post_date_format
-    return params
+1. A Flask context processor that injects parameters into templates
+2. A helper function for image paths
+3. A date formatting function
 
-def image_path(path, external=False):
-    base_url = '/static/images/'
-    if external:
-        base_url = app.config['BASE_URL'] + base_url
-    return base_url + path
+None of these functions use SQLAlchemy directly, so no changes are needed for the SQLAlchemy 1.4 to 2.1 migration.
 
-def post_date_format(time):
-    return utils.pretty_date(time)
+end_migration
