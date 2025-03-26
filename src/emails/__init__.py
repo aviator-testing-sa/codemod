@@ -70,10 +70,9 @@ def send_email(template_name,
     sg = _get_client()
     try:
         response = sg.client.mail.send.post(request_body=mail.get())
-    except Exception, e:
+    except Exception as e:
         sentry.captureException()
 
 
 def _get_client():
     return sendgrid.SendGridAPIClient(apikey=app.config['SENDGRID_API_KEY'])
-
