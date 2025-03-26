@@ -73,7 +73,7 @@ def upgrade():
     sa.Column('updated', sa.DateTime(), nullable=True),
     sa.Column('userid', sa.Integer(), nullable=False),
     sa.Column('date', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['userid'], [u'user.id'], ondelete=u'CASCADE'),
+    sa.ForeignKeyConstraint(['userid'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('auction',
