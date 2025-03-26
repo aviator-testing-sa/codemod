@@ -14,8 +14,8 @@ from flask import jsonify
 from flask import redirect
 from flask import render_template
 from flask import request
-from flask.ext.login import login_required
-from flask.ext.login import current_user
+from flask_login import login_required
+from flask_login import current_user
 from listing import controller
 from main import app
 
@@ -205,4 +205,3 @@ def post_send_message(user_id):
       except errors.ReinventError as e:
         return jsonify(success=False, error=e.message)
     return jsonify(success=False, error=utils.form_errors(form))
-
