@@ -6,11 +6,11 @@ import binascii
 import datetime
 import functools
 import hashlib
-import httplib
+import http.client as httplib
 import json
 import os
 import re
-import urllib
+import urllib.parse as urllib
 from unicodedata import normalize
 
 #
@@ -28,7 +28,7 @@ def response(encoder, *opts, **kwopts):
 def _json_encoder_response(data, **kwargs):
     import flask
     r = flask.jsonify(data)
-    for k,v in kwargs.iteritems():
+    for k,v in kwargs.items():
         setattr(r, k, v)
     return r
 
@@ -76,7 +76,7 @@ def slugify(text, delim=u'-'):
         word = normalize('NFKD', word).encode('ascii', 'ignore')
         if word:
             result.append(word)
-    return unicode(delim.join(result))
+    return str(delim.join(result))
 
 
 def buildurl(base, *args, **kwargs):
@@ -89,7 +89,7 @@ def buildurl(base, *args, **kwargs):
         endpoint = base
 
     def _gen():
-        for k,v in kwargs.iteritems():
+        for k,v in kwargs.items():
             if not isinstance(v, (tuple, list)):
                 v = v,
             for val in v:
@@ -105,10 +105,10 @@ def buildurl(base, *args, **kwargs):
 # cryptographic
 #
 def encrypt_with_salt(string, salt):
-    return hashlib.sha1(string + salt).hexdigest()
+    return hashlib.sha1((string + salt).encode('utf-8')).hexdigest()
 
 def encrypt_with_new_salt(string, bytes=16):
-    salt = binascii.b2a_hex(os.urandom(bytes))
+    salt = binascii.b2a_hex(os.urandom(bytes)).decode('utf-8')
     return salt, encrypt_with_salt(string, salt)
 
 
@@ -142,18 +142,17 @@ def pretty_date(time):
         if second_diff < 120:
             return "a minute ago"
         if second_diff < 3600:
-            return str(second_diff / 60) + " minutes ago"
+            return str(second_diff // 60) + " minutes ago"
         if second_diff < 7200:
             return "an hour ago"
         if second_diff < 86400:
-            return str(second_diff / 3600) + " hours ago"
+            return str(second_diff // 3600) + " hours ago"
     if day_diff == 1:
         return "Yesterday"
     if day_diff < 7:
         return str(day_diff) + " days ago"
     if day_diff < 31:
-        return str(day_diff / 7) + " weeks ago"
+        return str(day_diff // 7) + " weeks ago"
     if day_diff < 365:
-        return str(day_diff / 30) + " months ago"
-    return str(day_diff / 365) + " years ago"
-
+        return str(day_diff // 30) + " months ago"
+    return str(day_diff // 365) + " years ago"

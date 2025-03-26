@@ -28,7 +28,7 @@ def db(app, request):
     return db
 
 
-@pytest.yield_fixture(scope='session')
+@pytest.fixture(scope='session')
 def mailserver(app):
     import mailserver
     server = mailserver.debug_server(app.config['MAIL_SERVER'], app.config['MAIL_PORT'])
@@ -43,7 +43,7 @@ def mail(app, mailserver, request):
     return mail
 
 
-@pytest.yield_fixture(scope='function')
+@pytest.fixture(scope='function')
 def session(db, request):
     """Creates a new database session for a test."""
     connection = db.engine.connect()
@@ -72,11 +72,10 @@ def session(db, request):
     connection.close()
 
 
-@pytest.yield_fixture(scope='function')
+@pytest.fixture(scope='function')
 def client(session):
     """A Flask test client. An instance of :class:`flask.testing.TestClient`
     by default.
     """
     with main.app.test_client() as client:
         yield client
-
