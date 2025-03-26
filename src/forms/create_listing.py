@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from common import get_select_choices
 from config import categories
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from flask_wtf.file import FileField
 from wtforms import validators
 from wtforms import BooleanField
@@ -9,13 +9,13 @@ from wtforms import DateField
 from wtforms import IntegerField
 from wtforms import SelectField
 from wtforms import TextAreaField
-from wtforms import TextField
+from wtforms import StringField
 from wtforms_components import DateRange
 
 
-class CreateProductListing(Form):
-    name = TextField(validators=[validators.InputRequired()])
-    domain = TextField(validators=[validators.InputRequired()])
+class CreateProductListing(FlaskForm):
+    name = StringField(validators=[validators.InputRequired()])
+    domain = StringField(validators=[validators.InputRequired()])
     category = SelectField(choices=get_select_choices(categories.ALL, placeholder="Choose Category"))
     app_ios = BooleanField()
     app_android = BooleanField()
@@ -26,16 +26,16 @@ class CreateProductListing(Form):
     product_logo = FileField()
 
 
-class CreateDetailListing(Form):
-    linkedin = TextField()
-    angellist = TextField()
-    crunchbase = TextField()
+class CreateDetailListing(FlaskForm):
+    linkedin = StringField()
+    angellist = StringField()
+    crunchbase = StringField()
     product_info = TextAreaField()
     tech_stack = TextAreaField()
     founder_info = TextAreaField()
 
 
-class CreateBusinessListing(Form):
+class CreateBusinessListing(FlaskForm):
     incorporated = BooleanField()
     employees = IntegerField(validators=[validators.Optional()])
     launch_date = DateField(format="%m/%d/%Y", validators=[
