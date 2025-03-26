@@ -5,8 +5,8 @@
 import flask
 import httplib
 
-from flask.ext.login import login_required
-from flask.ext.login import current_user
+from flask_login import login_required
+from flask_login import current_user
 
 import controller
 from main import app

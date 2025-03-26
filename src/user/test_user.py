@@ -1,7 +1,3 @@
-#
-#
-#
-#
 from main import db
 import schema
 
@@ -14,4 +10,3 @@ def test_new_user(session):
 
     u2 = schema.user.User.get_by_slug("testmeN")
     assert user.slug == u2.slug
-
