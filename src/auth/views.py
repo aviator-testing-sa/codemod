@@ -12,10 +12,10 @@ from flask import render_template
 from flask import request
 from flask import session
 from flask import url_for
-from flask.ext.login import current_user
-from flask.ext.login import login_user
-from flask.ext.login import logout_user
-from flask.ext.login import login_required
+from flask import current_user
+from flask import login_user
+from flask import logout_user
+from flask import login_required
 
 from forms.reset_password import ResetPasswordForm
 from main import app, db
@@ -331,4 +331,3 @@ def change_password():
 def _login_user(user, remember=True):
     logged_in_user = CurrentUser(user)
     login_user(logged_in_user, remember=remember)
-

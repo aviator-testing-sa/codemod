@@ -19,10 +19,12 @@ import utils
 
 
 def login_user(user, remember=False):
-    flask.ext.login.login_user(CurrentUser(user), remember=remember)
+    import flask_login
+    flask_login.login_user(CurrentUser(user), remember=remember)
 
 def logout_user():
-    flask.ext.login.logout_user()
+    import flask_login
+    flask_login.logout_user()
 
 def get_user_by_name(name):
     """
@@ -125,11 +127,10 @@ def create_confirm_email(username, email, token):
             username=username, confirm_url=url, support_email=app.config['SUPPORT_EMAIL'])
 
     '''
-    msg = flask.ext.mail.Message(
-        sender=app.config['SUPPORT_EMAIL'],
-        recipients=[email],
-        subject="Activate account on Reinvent",
-        html=html)
+    # WOW I REPLACED THIS
+    recipients=[email],
+    subject="Activate account on Reinvent",
+    html=html)
     return msg
     '''
 
@@ -154,11 +155,10 @@ def create_reset_email(username, email, token):
         support_email=app.config['SUPPORT_EMAIL'])
 
     '''
-    msg = flask.ext.mail.Message(
-        sender=app.config['SUPPORT_EMAIL'],
-        recipients=[email],
-        subject="Reset your password on Reinvent",
-        html=html)
+    # WOW I REPLACED THIS
+    recipients=[email],
+    subject="Reset your password on Reinvent",
+    html=html)
 
     return msg
     '''
