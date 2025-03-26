@@ -439,9 +439,7 @@ def validate_pr_status(change_set: ChangeSet, pr: PullRequest) -> checks.TestRes
             pr_number=pr.number,
             pr_id=pr.id,
         )
-        return "success"
-
-    gql = graphql.GithubGql(access_token.token, access_token.account_id)
+        return "success"gql = graphql.GithubGql(access_token.token, access_token.account_id)
     decision = gql.get_review_decision(pr.repo.name, pr.number)
     if decision != "APPROVED":
         logger.info(

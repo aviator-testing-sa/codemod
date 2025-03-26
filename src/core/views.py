@@ -95,7 +95,7 @@ def yaml_config_history_get() -> RouteResponse:
     offset = (page - 1) * CONFIG_HISTORY_PAGE_SIZE
     config_history_records: list[ConfigHistory] = (
         ConfigHistory.query.filter_by(repo_id=repo.id, config_type=ConfigType.Main)
-        .filter(ConfigHistory.applied_at.isnot(None))
+        .filter(sa.sql.expression.or_(ConfigHistory.applied_at.is_not(None)))
         .order_by(ConfigHistory.created.desc())
         .offset(offset)
         .limit(CONFIG_HISTORY_PAGE_SIZE + 1)  # we need one extra for the diffs!
@@ -442,9 +442,7 @@ def fetch_github_repos() -> RouteResponse:
 @app.route("/internal/api/github/repos/fetch", methods=["POST"])
 @login_required
 def fetch_github_repos_json() -> tuple[Response, int]:
-    authorized, has_valid_token = _fetch_github_repos_internal()
-
-    if not authorized:
+    authorized, has_valid_token = _fetch_github_repos_internal()if not authorized:
         return (
             jsonify(
                 error="no-authorization",
@@ -467,10 +465,12 @@ def fetch_github_repos_json() -> tuple[Response, int]:
 
 def _fetch_github_repos_internal() -> tuple[bool, bool]:
     account_id = current_user.user.account_id
-    access_token: AccessToken | None = AccessToken.query.filter_by(
-        account_id=account_id,
-        is_valid=True,
-    ).first()
+    access_token: AccessToken | None = db.session.scalar(
+        sa.select(AccessToken).filter_by(
+            account_id=account_id,
+            is_valid=True,
+        )
+    )
     if not access_token:
         return (False, False)
 
@@ -492,9 +492,11 @@ def _fetch_github_repos_internal() -> tuple[bool, bool]:
 @maintainer_required
 def github_repo_action() -> RouteResponse:
     repo_name = request.args.get("repo_name")
-    repo: GithubRepo | None = GithubRepo.query.filter_by(
-        account_id=current_user.user.account_id, name=repo_name
-    ).first()
+    repo: GithubRepo | None = db.session.scalar(
+        sa.select(GithubRepo).filter_by(
+            account_id=current_user.user.account_id, name=repo_name
+        )
+    )
     if not repo:
         return redirect("/github/repos")
     action = request.args.get("action")
@@ -545,9 +547,11 @@ def github_repo_action() -> RouteResponse:
 @maintainer_required
 def github_repo_action_json() -> RouteResponse:
     repo_name: str = request.json["repo_name"].strip()
-    repo: GithubRepo | None = GithubRepo.query.filter_by(
-        account_id=current_user.user.account_id, name=repo_name
-    ).first()
+    repo: GithubRepo | None = db.session.scalar(
+        sa.select(GithubRepo).filter_by(
+            account_id=current_user.user.account_id, name=repo_name
+        )
+    )
     if not repo:
         return (
             jsonify(error="invalid-repo", message="Invalid repo"),
@@ -608,9 +612,11 @@ def github_repo_action_json() -> RouteResponse:
 @admin_required
 def github_repo_delete() -> RouteResponse:
     repo_id: str = request.form.get("repo_id")  # type: ignore[assignment]
-    repo: GithubRepo = GithubRepo.query.filter_by(
-        account_id=current_user.user.account_id, id=int(repo_id)
-    ).first()
+    repo: GithubRepo = db.session.scalar(
+        sa.select(GithubRepo).filter_by(
+            account_id=current_user.user.account_id, id=int(repo_id)
+        )
+    )
     if not repo:
         return jsonify(success=False, error="Invalid repo selected or already removed")
 
@@ -630,9 +636,11 @@ def github_repo_delete() -> RouteResponse:
 @admin_required
 def github_repo_delete_json() -> RouteResponse:
     repo_name: str = request.json["repo_name"].strip()
-    repo: GithubRepo | None = GithubRepo.query.filter_by(
-        account_id=current_user.user.account_id, name=repo_name
-    ).first()
+    repo: GithubRepo | None = db.session.scalar(
+        sa.select(GithubRepo).filter_by(
+            account_id=current_user.user.account_id, name=repo_name
+        )
+    )
     if not repo:
         return (
             jsonify(
@@ -666,8 +674,10 @@ def github_users() -> RouteResponse:
     repos = _active_repos()
     if not repos:
         return redirect("/github/repos")
-    gusers: list[GithubUser] = GithubUser.query.filter_by(
-        account_id=current_user.user.account_id
+    gusers: list[GithubUser] = db.session.scalars(
+        sa.select(GithubUser).filter_by(
+            account_id=current_user.user.account_id
+        )
     ).all()
     billed_count = len([u for u in gusers if u.billed])
     total_count = len([u for u in gusers])
@@ -687,9 +697,11 @@ def github_users_json() -> RouteResponse:
     repos = _active_repos()
 
     offset = COLLABORATORS_PER_PAGE * (page - 1) if page > 1 else 0
-    total_github_users_count: int = GithubUser.query.filter_by(
-        account_id=user.account_id
-    ).count()
+    total_github_users_count: int = db.session.scalar(
+        sa.select(sa.func.count()).select_from(GithubUser).filter_by(
+            account_id=user.account_id
+        )
+    )
 
     page_gh_users_info = [
         {
@@ -697,11 +709,13 @@ def github_users_json() -> RouteResponse:
             "username": user.username,
             "billed": user.billed,
         }
-        for user in GithubUser.query.filter_by(account_id=current_user.user.account_id)
-        .order_by(GithubUser.account_id.desc())
-        .offset(offset)
-        .limit(COLLABORATORS_PER_PAGE)
-        .all()
+        for user in db.session.scalars(
+            sa.select(GithubUser)
+            .filter_by(account_id=current_user.user.account_id)
+            .order_by(GithubUser.account_id.desc())
+            .offset(offset)
+            .limit(COLLABORATORS_PER_PAGE)
+        ).all()
     ]
 
     account = Account.get_by_id_x(user.account_id)
@@ -756,9 +770,11 @@ def validate_yaml_config_post() -> RouteResponse:
     action = request.form.get("submit")
     yaml_input = request.form.get("yaml_input", "")
     repo_name = request.form.get("repo_name", "")
-    repo: GithubRepo | None = GithubRepo.query.filter_by(
-        account_id=current_user.user.account_id, name=repo_name
-    ).first()
+    repo: GithubRepo | None = db.session.scalar(
+        sa.select(GithubRepo).filter_by(
+            account_id=current_user.user.account_id, name=repo_name
+        )
+    )
     if not repo:
         return abort(403, "unable to find repository")
     if not yaml_input:
@@ -850,9 +866,11 @@ def api_config_update_post() -> RouteResponse:
     user = token_auth.current_user().user
     yaml_input = request.get_data(as_text=True)
     repo_name = request.args.get("org", "") + "/" + request.args.get("repo", "")
-    repo: GithubRepo | None = GithubRepo.query.filter_by(
-        account_id=user.account_id, name=repo_name
-    ).first()
+    repo: GithubRepo | None = db.session.scalar(
+        sa.select(GithubRepo).filter_by(
+            account_id=user.account_id, name=repo_name
+        )
+    )
     if not repo:
         return abort(403, f"unable to find repository: {repo_name}")
     if not yaml_input:
@@ -888,28 +906,27 @@ def api_config_update_post() -> RouteResponse:
         )
 
     # redirect back to the GET page with correct repo name
-    return jsonify(success=True)
-
-
-@app.route("/api/v1/config", methods=["GET"])
+    return jsonify(success=True)@app.route("/api/v1/config", methods=["GET"])
 @token_auth.login_required
 def api_config_get() -> RouteResponse:
     user = token_auth.current_user().user
     repo_name = request.args.get("org", "") + "/" + request.args.get("repo", "")
-    repo: GithubRepo | None = GithubRepo.query.filter_by(
-        account_id=user.account_id, name=repo_name
-    ).first()
+    repo: GithubRepo | None = db.session.execute(
+        sa.select(GithubRepo).filter_by(
+            account_id=user.account_id, name=repo_name
+        )
+    ).scalar_one_or_none()
     if not repo:
         return abort(403, f"unable to find repository: {repo_name}")
     return _get_current_config(repo)
 
 
 def _get_current_config(repo: GithubRepo) -> str:
-    current_history = (
-        ConfigHistory.query.filter_by(repo_id=repo.id, config_type=ConfigType.Main)
+    current_history = db.session.execute(
+        sa.select(ConfigHistory)
+        .filter_by(repo_id=repo.id, config_type=ConfigType.Main)
         .order_by(ConfigHistory.id.desc())
-        .first()
-    )
+    ).scalar_one_or_none()
     if current_history:
         return current_history.config_text
 
@@ -936,9 +953,9 @@ def github_billed_users() -> RouteResponse:
     repos = _active_repos()
     if not repos:
         return redirect("/github/repos")
-    gusers: list[GithubUser] = GithubUser.query.filter_by(
-        account_id=current_user.user.account_id
-    ).all()
+    gusers: list[GithubUser] = db.session.execute(
+        sa.select(GithubUser).filter_by(account_id=current_user.user.account_id)
+    ).scalars().all()
     total_count = len([u for u in gusers])
     users = [u for u in gusers if u.billed]
     billed_count = len(users)
@@ -956,9 +973,9 @@ def github_billed_users() -> RouteResponse:
 def reset_queue() -> RouteResponse:
     repo_name = request.form.get("repo_name")
     account_id = current_user.user.account_id
-    repo: GithubRepo | None = GithubRepo.query.filter_by(
-        name=repo_name, account_id=account_id
-    ).first()
+    repo: GithubRepo | None = db.session.execute(
+        sa.select(GithubRepo).filter_by(name=repo_name, account_id=account_id)
+    ).scalar_one_or_none()
     success = False
     error = None
     if not repo or not repo.parallel_mode:
@@ -983,9 +1000,9 @@ def reset_queue() -> RouteResponse:
 def process_all_queue() -> RouteResponse:
     repo_name = request.form.get("repo_name")
     account_id = current_user.user.account_id
-    repo: GithubRepo | None = GithubRepo.query.filter_by(
-        name=repo_name, account_id=account_id
-    ).first()
+    repo: GithubRepo | None = db.session.execute(
+        sa.select(GithubRepo).filter_by(name=repo_name, account_id=account_id)
+    ).scalar_one_or_none()
     success = False
     error = None
     if not repo or not repo.is_no_queue_mode:
@@ -1011,9 +1028,11 @@ def auth_dev_token() -> RouteResponse:
     elif request.method == "POST":
         token: str = request.form.get("dev_token")  # type: ignore[assignment]
         if connect.validate_access_token(token, current_user.user.account_id):
-            access_token: AccessToken | None = AccessToken.query.filter_by(
-                account_id=current_user.user.account_id,
-            ).first()
+            access_token: AccessToken | None = db.session.execute(
+                sa.select(AccessToken).filter_by(
+                    account_id=current_user.user.account_id,
+                )
+            ).scalar_one_or_none()
             if not access_token or not connect.is_dev_token(access_token):
                 # If the current token is not a PAT, create a new token. This way
                 # we can keep the existing token as a secondary token.
@@ -1028,9 +1047,9 @@ def auth_dev_token() -> RouteResponse:
             access_token.is_valid = True
             # if the user is setting their dev token,
             # we should set this token as the access_token for all repos under their account_id
-            repos: list[GithubRepo] = GithubRepo.query.filter_by(
-                account_id=current_user.user.account_id
-            ).all()
+            repos: list[GithubRepo] = db.session.execute(
+                sa.select(GithubRepo).filter_by(account_id=current_user.user.account_id)
+            ).scalars().all()
             for r in repos:
                 r.access_token_id = access_token.id
             db.session.commit()
@@ -1181,28 +1200,28 @@ def _find_latest_pr_for_users(
 def _get_all_db_tests() -> list[GithubTest]:
     repo = _selected_repo()
     if repo:
-        return (
-            GithubTest.query.filter_by(repo_id=repo.id)
+        return db.session.execute(
+            sa.select(GithubTest)
+            .filter_by(repo_id=repo.id)
             .order_by(GithubTest.id.asc())
-            .all()
-        )
+        ).scalars().all()
     return []
 
 
 def _all_repos() -> list[GithubRepo]:
-    return (
-        GithubRepo.query.filter_by(account_id=current_user.user.account_id)
+    return db.session.execute(
+        sa.select(GithubRepo)
+        .filter_by(account_id=current_user.user.account_id)
         .order_by("id")
-        .all()
-    )
+    ).scalars().all()
 
 
 def _active_repos() -> list[GithubRepo]:
-    return (
-        GithubRepo.query.filter_by(account_id=current_user.user.account_id, active=True)
+    return db.session.execute(
+        sa.select(GithubRepo)
+        .filter_by(account_id=current_user.user.account_id, active=True)
         .order_by("id")
-        .all()
-    )
+    ).scalars().all()
 
 
 def _selected_repo() -> GithubRepo | None:
@@ -1225,7 +1244,9 @@ def _update_labels(
     labels: list[str],
     purpose: GithubLabelPurpose,
 ) -> None:
-    dblabels = GithubLabel.query.filter_by(repo_id=repo.id, purpose=purpose).all()
+    dblabels = db.session.execute(
+        sa.select(GithubLabel).filter_by(repo_id=repo.id, purpose=purpose)
+    ).scalars().all()
     dblabel_names = [l.name for l in dblabels]
     for dblabel in dblabels:
         if dblabel.name not in labels:
@@ -1238,7 +1259,9 @@ def _update_labels(
 
 
 def _update_branches(repo: GithubRepo, branches: list[str]) -> None:
-    db_branches: list[BaseBranch] = BaseBranch.query.filter_by(repo_id=repo.id).all()
+    db_branches: list[BaseBranch] = db.session.execute(
+        sa.select(BaseBranch).filter_by(repo_id=repo.id)
+    ).scalars().all()
     db_branches_names = [b.name for b in db_branches]
     for db_branch in db_branches:
         if db_branch.name not in branches:

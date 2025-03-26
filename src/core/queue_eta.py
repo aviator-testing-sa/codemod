@@ -24,10 +24,12 @@ def calculate_queue_eta() -> None:
     end_inclusive = datetime.date.fromisocalendar(current_year, current_week, 7)
 
     repos: list[GithubRepo] = (
-        GithubRepo.query.filter_by(active=True)
-        .join(Account)
-        .filter(Account.billing_active)
-        .all()
+        db.session.execute(
+            sa.select(GithubRepo)
+            .filter_by(active=True)
+            .join(Account)
+            .filter(Account.billing_active)
+        ).scalars().all()
     )
 
     for repo in repos:

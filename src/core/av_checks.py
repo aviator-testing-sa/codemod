@@ -103,10 +103,10 @@ def _get_gh_status(status: str) -> str:
 
 def _get_gh_conclusion(
     status: str,
-) -> str | pygithub.NotSetType:
+) -> str | None:
     if status in ("success", "failure"):
         return status
-    return pygithub.NotSet
+    return None
 
 
 def _get_title(pr: PullRequest, status: str) -> str:

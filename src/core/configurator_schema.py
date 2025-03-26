@@ -444,17 +444,15 @@ class MergeRules(StrictBaseModel):
         default=[],
         description="These branches are the ones that Aviator will monitor as valid branches to merge into. "
         "Defaults to your repository default branch as configured on GitHub. Regexes are allowed.",
-    )
-
-    @field_validator("publish_status_check", mode="before")
-    @classmethod
-    def validate_publish_status_check(cls, value: object) -> str:
-        if not value:
-            return "never"  # For backward compatibility
-        if isinstance(value, bool):
-            return "ready" if value else "never"
-        # We let the pydantic validator handle the rest of the validation
-        return value  # type: ignore[return-value]
+    )@field_validator("publish_status_check", mode="before")
+@classmethod
+def validate_publish_status_check(cls, value: object) -> str:
+    if not value:
+        return "never"  # For backward compatibility
+    if isinstance(value, bool):
+        return "ready" if value else "never"
+    # We let the pydantic validator handle the rest of the validation
+    return value  # type: ignore[return-value]
 
 
 class Configuration(StrictBaseModel):

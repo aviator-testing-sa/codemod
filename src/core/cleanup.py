@@ -23,14 +23,16 @@ def clean_up_gh_test_status(*, lookback_days: int, delete: bool) -> None:
 
     start = time_util.now()
     if delete:
-        deleted_count = GithubTestStatus.query.filter(
-            GithubTestStatus.created < lookback_time
-        ).delete()
+        deleted_count = db.session.execute(
+            db.delete(GithubTestStatus).where(GithubTestStatus.created < lookback_time)
+        ).rowcount
         db.session.commit()
     else:
-        deleted_count = GithubTestStatus.query.filter(
-            GithubTestStatus.created < lookback_time
-        ).count()
+        deleted_count = db.session.execute(
+            db.select(db.func.count()).select_from(GithubTestStatus).where(
+                GithubTestStatus.created < lookback_time
+            )
+        ).scalar_one()
     duration = time_util.now() - start
 
     logger.info(

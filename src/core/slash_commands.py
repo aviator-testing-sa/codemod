@@ -412,12 +412,12 @@ def _handle_flexreview_breakglass(args: SlashCommandArgs) -> None:
     repo.bind_contextvars()
     pr.bind_contextvars()
 
-    existing_record: BreakglassApproval | None = db.session.scalar(
+    existing_record: BreakglassApproval | None = db.session.execute(
         sa.select(BreakglassApproval).where(
             BreakglassApproval.pull_request_id == pr.id,
             BreakglassApproval.github_user_id == gh_user.id,
-        ),
-    )
+        )
+    ).scalar_one_or_none()
     if existing_record:
         gh_pull.create_issue_comment(
             f"Error: Breakglass override already recorded by user @{existing_record.github_user.username}.",
@@ -445,9 +445,7 @@ def _handle_flexreview_breakglass(args: SlashCommandArgs) -> None:
         action=AuditLogAction.FLEXREVIEW_BREAKGLASS_SLASH_COMMAND,
         entity=AuditLogEntity.FLEXREVIEW,
         target=str(pr.id),
-    )
-
-    notify_breakglass.delay(pr.id, gh_user.id, breakglass_reason)
+    )notify_breakglass.delay(pr.id, gh_user.id, breakglass_reason)
 
     gh_pull.create_issue_comment(
         "Breakglass override recorded. One additional approval is required.",
