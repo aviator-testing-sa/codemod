@@ -5,8 +5,8 @@ from flask import redirect
 from flask import render_template
 from flask import send_from_directory
 from flask import url_for
-from flask.ext.login import current_user
-from flask.ext.login import login_required
+from flask_login import current_user
+from flask_login import login_required
 from main import app
 
 @app.route('/')
