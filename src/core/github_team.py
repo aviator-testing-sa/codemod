@@ -219,8 +219,8 @@ def _fetch_teams_and_members_from_github(
         ):
             logger.info("Skipped due to cached snapshot")
             return
-
-        # Set status to loading or new so other workers won't pick it up
+# Set status to loading or new so other workers won't pick it up
+# Set status to loading or new so other workers won't pick it up
         cache_record.status = SyncStatus.LOADING
     else:
         cache_record = GithubTeamSyncStatus(
