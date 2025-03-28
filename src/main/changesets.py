@@ -34,16 +34,16 @@ DEFAULT_CHECK_NAME = "mergequeue/changeset"
 def create_new_changeset(account_id: int, owner_id: int | None) -> ChangeSet:
     lock_name = f"changeset-account-{account_id}"
     with locks.lock("changeset", lock_name, expire=20):
-        last_change_set = db.session.scalar(
+        last_change_set = db.session.execute(
             sa.select(ChangeSet)
             .where(ChangeSet.account_id == account_id, ChangeSet.deleted.is_(False))
             .order_by(ChangeSet.number.desc()),
-        )
-        last_deleted_change_set = db.session.scalar(
+        ).scalars().first()
+        last_deleted_change_set = db.session.execute(
             sa.select(ChangeSet)
             .where(ChangeSet.account_id == account_id, ChangeSet.deleted.is_(True))
             .order_by(ChangeSet.number.desc()),
-        )
+        ).scalars().first()
         number = (last_change_set.number + 1) if last_change_set else 1
         if last_deleted_change_set and last_deleted_change_set.number >= number:
             number = last_deleted_change_set.number + 1
@@ -62,12 +62,12 @@ def create_new_changeset(account_id: int, owner_id: int | None) -> ChangeSet:
 def send_run_webhook(changeset_run_id: int) -> None:
     changeset_run = ChangeSetRun.get_by_id_x(changeset_run_id)
     change_set = changeset_run.change_set
-    webhook = db.session.scalar(
+    webhook = db.session.execute(
         sa.select(MasterWebhook).where(
             MasterWebhook.account_id == change_set.account_id,
             MasterWebhook.deleted.is_(False),
         ),
-    )
+    ).scalars().first()
     owner_email = change_set.owner.email if change_set.owner else ""
 
     if changeset_run.commits:
@@ -163,7 +163,7 @@ def set_change_set_run_failure(changeset_run: ChangeSetRun) -> None:
 
 def refresh_status_checks(pr: PullRequest) -> None:
     # We only care about the most recent check run.
-    check_commit: ChangeSetRunCommit | None = db.session.scalar(
+    check_commit: ChangeSetRunCommit | None = db.session.execute(
         sa.select(ChangeSetRunCommit)
         .where(
             ChangeSetRunCommit.pull_request_id == pr.id,
@@ -171,7 +171,7 @@ def refresh_status_checks(pr: PullRequest) -> None:
             ChangeSetRunCommit.deleted.is_(False),
         )
         .order_by(ChangeSetRunCommit.change_set_run_id.desc()),
-    )
+    ).scalars().first()
     if not check_commit:
         logger.info(
             "No check runs associated with a PR",
@@ -182,12 +182,12 @@ def refresh_status_checks(pr: PullRequest) -> None:
         return
 
     # Get all the associated checks returned by the user.
-    change_set_run_checks: list[ChangeSetRunCheck] = db.session.scalars(
+    change_set_run_checks: list[ChangeSetRunCheck] = db.session.execute(
         sa.select(ChangeSetRunCheck).where(
             ChangeSetRunCheck.change_set_run_id == check_commit.change_set_run_id,
             ChangeSetRunCheck.deleted.is_(False),
         ),
-    ).all()
+    ).scalars().all()
     for change_set_run_check in change_set_run_checks:
         create_or_update_check_with_retries(change_set_run_check, check_commit)
     logger.info(
@@ -219,8 +219,6 @@ def create_or_update_check_with_retries(
             commit_id=commit.id,
         )
         create_or_update_check_async.delay(change_set_run_check.id, commit.id)
-
-
 @celery.task(
     autoretry_for=(Exception,),
     retry_backoff=10,
@@ -232,8 +230,6 @@ def create_or_update_check_async(change_set_run_check_id: int, commit_id: int) -
     commit = ChangeSetRunCommit.get_by_id_x(commit_id)
     assert commit, f"ChangeSetRunCommit {commit_id} not found"
     create_or_update_check(change_set_run_check, commit)
-
-
 def create_or_update_check(
     change_set_run_check: ChangeSetRunCheck,
     commit: ChangeSetRunCommit,
@@ -368,12 +364,12 @@ def validate_and_merge_prs(change_set_id: int) -> None:
 
 
 def process_queued_changesets() -> None:
-    change_sets: list[ChangeSet] = db.session.scalars(
+    change_sets: list[ChangeSet] = db.session.execute(
         sa.select(ChangeSet).where(
             ChangeSet.status == "queued",
             ChangeSet.deleted.is_(False),
         ),
-    ).all()
+    ).scalars().all()
     for change_set in change_sets:
         validate_and_merge_prs.delay(change_set.id)
 
@@ -440,8 +436,7 @@ def validate_pr_status(change_set: ChangeSet, pr: PullRequest) -> checks.TestRes
             pr_id=pr.id,
         )
         return "success"
-
-    gql = graphql.GithubGql(access_token.token, access_token.account_id)
+gql = graphql.GithubGql(access_token.token, access_token.account_id)
     decision = gql.get_review_decision(pr.repo.name, pr.number)
     if decision != "APPROVED":
         logger.info(
@@ -452,8 +447,7 @@ def validate_pr_status(change_set: ChangeSet, pr: PullRequest) -> checks.TestRes
         )
         update_mapping(change_set, pr, StatusCode.NOT_APPROVED)
         return "pending"
-
-    reqd_approvers = [u.username for u in pr.repo.required_users]
+reqd_approvers = [u.username for u in pr.repo.required_users]
     if not client.is_approved(
         pull,
         pr.repo.preconditions.number_of_approvals,
@@ -574,32 +568,32 @@ def is_run_latest(change_set: ChangeSet) -> bool:
 
 
 def requires_ci(account_id: int) -> bool:
-    config: ChangeSetConfig | None = db.session.scalar(
+    config: ChangeSetConfig | None = db.session.execute(
         sa.select(ChangeSetConfig).where(
             ChangeSetConfig.account_id == account_id,
             ChangeSetConfig.deleted.is_(False),
-        ),
-    )
+        )
+    ).scalars().first()
     return config.require_global_ci if config else False
 
 
 def get_signature(account_id: int, body: str) -> str:
-    token: ApiToken | None = db.session.scalar(
+    token: ApiToken | None = db.session.execute(
         sa.select(ApiToken).where(
             ApiToken.account_id == account_id,
             ApiToken.deleted.is_(False),
-        ),
-    )
+        )
+    ).scalars().first()
     return token.calculate_signature(body) if token else ""
 
 
 def get_aviator_signature_sha256(account_id: int, body: str) -> str:
-    token: ApiToken | None = db.session.scalar(
+    token: ApiToken | None = db.session.execute(
         sa.select(ApiToken).where(
             ApiToken.account_id == account_id,
             ApiToken.deleted.is_(False),
-        ),
-    )
+        )
+    ).scalars().first()
     return token.calculate_signature_256(body) if token else ""
 
 
@@ -607,11 +601,11 @@ def add_pr_to_changeset(change_set: ChangeSet, pr: PullRequest) -> ChangeSet:
     if pr.account_id != change_set.account_id:
         raise Exception("Change set account doesn't match")
 
-    existing_changeset: ChangeSetMapping | None = db.session.scalar(
+    existing_changeset: ChangeSetMapping | None = db.session.execute(
         sa.select(ChangeSetMapping).where(
             ChangeSetMapping.pull_request_id == pr.id,
-        ),
-    )
+        )
+    ).scalars().first()
     if existing_changeset and not existing_changeset.change_set.deleted:
         raise PullRequestAlreadyInChangesetError
 
@@ -656,8 +650,6 @@ def create_changeset_from_prs(
     for pr in pr_list:
         comments.post_pull_comment.delay(pr.id, "change_set", note=str(cs.number))
     return cs
-
-
 def create_changeset_from_relevant_prs(pr: PullRequest) -> ChangeSet | None:
     # Find relevant PRs with the same branch name
     # and their associated Changesets
@@ -680,8 +672,7 @@ def create_changeset_from_relevant_prs(pr: PullRequest) -> ChangeSet | None:
     # be included by the query. This handles the edge case
     if pr not in relevant_prs:
         relevant_prs.insert(0, pr)
-
-    change_sets = set()
+change_sets = set()
     for p in relevant_prs:
         for cs in p.change_sets:
             if not cs.deleted:
