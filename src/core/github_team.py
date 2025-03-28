@@ -37,11 +37,11 @@ def create_or_update_github_team_from_webhook(
     fetch_members: bool = False,
 ) -> GithubTeam:
     if gh_team.parent:
-        parent_team: GithubTeam | None = db.session.scalar(
+        parent_team: GithubTeam | None = db.session.execute(
             sa.select(GithubTeam).where(
                 GithubTeam.github_database_id == gh_team.parent.id
             )
-        )
+        ).scalars().first()
         if not parent_team:
             logger.warning(
                 "Parent team is missing while processing webhook. Try to create and proceed",
@@ -58,11 +58,11 @@ def create_or_update_github_team_from_webhook(
     else:
         parent_team = None
 
-    team: GithubTeam | None = db.session.scalar(
+    team: GithubTeam | None = db.session.execute(
         sa.select(GithubTeam).where(
             GithubTeam.github_database_id == gh_team.id,
         )
-    )
+    ).scalars().first()
     if team:
         team.name = gh_team.name
         team.slug = gh_team.slug
@@ -172,11 +172,9 @@ def update_team_members(
             sa.delete(GithubTeamMembers).where(
                 sa.and_(
                     GithubTeamMembers.github_team_id == team.id,
-                    GithubTeamMembers.github_user_id
-                    == sa.func.any([m.id for m in removed_members]),
+                    GithubTeamMembers.github_user_id.in_([m.id for m in removed_members]),
                 )
-            ),
-            execution_options={"synchronize_session": False},
+            )
         )
     db.session.commit()
 
@@ -189,12 +187,12 @@ def _fetch_teams_and_members_from_github(
     freshness: timedelta = timedelta(weeks=1),
 ) -> None:
     # Try to get from cached results
-    cache_record: GithubTeamSyncStatus | None = db.session.scalar(
+    cache_record: GithubTeamSyncStatus | None = db.session.execute(
         sa.select(GithubTeamSyncStatus).where(
             GithubTeamSyncStatus.account_id == account.id,
             GithubTeamSyncStatus.organization == organization,
         )
-    )
+    ).scalars().first()
 
     if cache_record:
         # Skip if this is not a valid organization
@@ -211,16 +209,14 @@ def _fetch_teams_and_members_from_github(
                 logger.info(
                     "Previous status is still NEW/LOADING, it's been a while. Refetching"
                 )
-
-        if (
+if (
             not force_refetch
             and cache_record.status == SyncStatus.SUCCESS
             and cache_record.synced_at + freshness > time_util.now()
         ):
             logger.info("Skipped due to cached snapshot")
             return
-
-        # Set status to loading or new so other workers won't pick it up
+# Set status to loading or new so other workers won't pick it up
         cache_record.status = SyncStatus.LOADING
     else:
         cache_record = GithubTeamSyncStatus(
@@ -231,8 +227,7 @@ def _fetch_teams_and_members_from_github(
         )
         db.session.add(cache_record)
     db.session.commit()
-
-    try:
+try:
         # GitHub database ID to GithubTeamInfo
         github_teams_hash: dict[int, GithubTeamInfo] = gql.fetch_teams_in_org(
             org_name=organization, root_only=False
@@ -240,12 +235,12 @@ def _fetch_teams_and_members_from_github(
         logger.info(
             "Fetched teams", organization=organization, count=len(github_teams_hash)
         )
-        existing_teams: list[GithubTeam] = db.session.scalars(
+        existing_teams: list[GithubTeam] = db.session.execute(
             sa.select(GithubTeam).where(
                 GithubTeam.account_id == account.id,
                 GithubTeam.organization == organization,
             )
-        ).all()
+        ).scalars().all()
         existing_teams_dict: dict[int, GithubTeam] = {
             team.github_database_id: team for team in existing_teams
         }
