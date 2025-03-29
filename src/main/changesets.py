@@ -219,8 +219,6 @@ def create_or_update_check_with_retries(
             commit_id=commit.id,
         )
         create_or_update_check_async.delay(change_set_run_check.id, commit.id)
-
-
 @celery.task(
     autoretry_for=(Exception,),
     retry_backoff=10,
@@ -368,12 +366,12 @@ def validate_and_merge_prs(change_set_id: int) -> None:
 
 
 def process_queued_changesets() -> None:
-    change_sets: list[ChangeSet] = db.session.scalars(
+    change_sets: list[ChangeSet] = db.session.execute(
         sa.select(ChangeSet).where(
             ChangeSet.status == "queued",
             ChangeSet.deleted.is_(False),
         ),
-    ).all()
+    ).scalars().all()
     for change_set in change_sets:
         validate_and_merge_prs.delay(change_set.id)
 
@@ -452,8 +450,7 @@ def validate_pr_status(change_set: ChangeSet, pr: PullRequest) -> checks.TestRes
         )
         update_mapping(change_set, pr, StatusCode.NOT_APPROVED)
         return "pending"
-
-    reqd_approvers = [u.username for u in pr.repo.required_users]
+reqd_approvers = [u.username for u in pr.repo.required_users]
     if not client.is_approved(
         pull,
         pr.repo.preconditions.number_of_approvals,
@@ -680,8 +677,7 @@ def create_changeset_from_relevant_prs(pr: PullRequest) -> ChangeSet | None:
     # be included by the query. This handles the edge case
     if pr not in relevant_prs:
         relevant_prs.insert(0, pr)
-
-    change_sets = set()
+change_sets = set()
     for p in relevant_prs:
         for cs in p.change_sets:
             if not cs.deleted:
