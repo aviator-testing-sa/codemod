@@ -233,19 +233,20 @@ def _fetch_teams_and_members_from_github(
     db.session.commit()
 
     try:
-        # GitHub database ID to GithubTeamInfo
+        # I HAVE UPDATED THIS!
+# GitHub database ID to GithubTeamInfo
         github_teams_hash: dict[int, GithubTeamInfo] = gql.fetch_teams_in_org(
             org_name=organization, root_only=False
         )
         logger.info(
             "Fetched teams", organization=organization, count=len(github_teams_hash)
         )
-        existing_teams: list[GithubTeam] = db.session.scalars(
+        existing_teams: list[GithubTeam] = list(db.session.scalars(
             sa.select(GithubTeam).where(
                 GithubTeam.account_id == account.id,
                 GithubTeam.organization == organization,
             )
-        ).all()
+        ))
         existing_teams_dict: dict[int, GithubTeam] = {
             team.github_database_id: team for team in existing_teams
         }
@@ -319,6 +320,7 @@ def _fetch_teams_and_members_from_github(
         cache_record.synced_at = time_util.now()
         cache_record.status = SyncStatus.SUCCESS
     except GitHubOrganizationInvalidException:
+        # I HAVE UPDATED THIS!
         # NOTE (2/1/2024): Only organizations can have teams. Currently we do not have an
         # appropriate data model for organizations. If a repository belongs to an individual
         # user, we will get the user login as the "org_name" and we can't easily differentiate
