@@ -231,6 +231,7 @@ def create_or_update_check_async(change_set_run_check_id: int, commit_id: int) -
     change_set_run_check = ChangeSetRunCheck.get_by_id_x(change_set_run_check_id)
     commit = ChangeSetRunCommit.get_by_id_x(commit_id)
     assert commit, f"ChangeSetRunCommit {commit_id} not found"
+
     create_or_update_check(change_set_run_check, commit)
 
 
@@ -439,31 +440,7 @@ def validate_pr_status(change_set: ChangeSet, pr: PullRequest) -> checks.TestRes
             pr_number=pr.number,
             pr_id=pr.id,
         )
-        return "success"
 
-    gql = graphql.GithubGql(access_token.token, access_token.account_id)
-    decision = gql.get_review_decision(pr.repo.name, pr.number)
-    if decision != "APPROVED":
-        logger.info(
-            "PR validation pending: missing approval",
-            repo_id=pr.repo_id,
-            pr_number=pr.number,
-            pr_id=pr.id,
-        )
-        update_mapping(change_set, pr, StatusCode.NOT_APPROVED)
-        return "pending"
-
-    reqd_approvers = [u.username for u in pr.repo.required_users]
-    if not client.is_approved(
-        pull,
-        pr.repo.preconditions.number_of_approvals,
-        reqd_approvers,
-    ):
-        logger.info(
-            "PR validation pending: not approved",
-            repo_id=pr.repo_id,
-            pr_number=pr.number,
-            pr_id=pr.id,
         )
         update_mapping(change_set, pr, StatusCode.NOT_APPROVED)
         return "pending"
@@ -697,6 +674,8 @@ def create_changeset_from_relevant_prs(pr: PullRequest) -> ChangeSet | None:
         add_pr_to_changeset(change_set, pr)
         logger.info(
             "Added PR to an existing relevant change set",
+
+```python
             change_set=change_set.id,
             pr_number=pr.number,
             branch_name=pr.branch_name,
@@ -723,3 +702,4 @@ def create_changeset_from_relevant_prs(pr: PullRequest) -> ChangeSet | None:
         )
 
     return change_set
+```
