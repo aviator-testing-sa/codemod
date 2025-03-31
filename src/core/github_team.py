@@ -172,8 +172,7 @@ def update_team_members(
             sa.delete(GithubTeamMembers).where(
                 sa.and_(
                     GithubTeamMembers.github_team_id == team.id,
-                    GithubTeamMembers.github_user_id
-                    == sa.func.any([m.id for m in removed_members]),
+                    GithubTeamMembers.github_user_id.in_([m.id for m in removed_members]),
                 )
             ),
             execution_options={"synchronize_session": False},
@@ -230,9 +229,7 @@ def _fetch_teams_and_members_from_github(
             synced_at=time_util.now(),
         )
         db.session.add(cache_record)
-    db.session.commit()
-
-    try:
+    db.session.commit()    try:
         # GitHub database ID to GithubTeamInfo
         github_teams_hash: dict[int, GithubTeamInfo] = gql.fetch_teams_in_org(
             org_name=organization, root_only=False
